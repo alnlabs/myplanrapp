@@ -8,13 +8,19 @@ import '../../features/auth/presentation/register_screen.dart';
 import '../../features/expenses/presentation/expenses_screen.dart';
 import '../../features/home/presentation/dashboard_screen.dart';
 import '../../features/home/presentation/home_shell.dart';
+import '../../features/home/presentation/more_screen.dart';
 import '../../features/household/presentation/household_setup_screen.dart';
+import '../../features/household/presentation/setup_wizard_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/onboarding/providers/onboarding_provider.dart';
 import '../../features/pantry/presentation/pantry_item_form_screen.dart';
-import '../../features/pantry/presentation/pantry_screen.dart';
+import '../../features/inventory/presentation/inventory_screen.dart';
+import '../../features/plans/presentation/plan_form_screen.dart';
+import '../../features/plans/presentation/plans_screen.dart';
 import '../../features/recipes/presentation/recipes_screen.dart';
 import '../../features/shopping/presentation/shopping_screen.dart';
+import '../../features/subscriptions/presentation/subscription_form_screen.dart';
+import '../../features/subscriptions/presentation/subscriptions_screen.dart';
 import '../providers/supabase_providers.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -42,8 +48,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           !path.startsWith('/home') &&
           !path.startsWith('/pantry') &&
           !path.startsWith('/recipes') &&
-          !path.startsWith('/expenses') &&
-          !path.startsWith('/shop') &&
+          !path.startsWith('/more') &&
+          !path.startsWith('/plans') &&
+          !path.startsWith('/subscriptions') &&
+          !path.startsWith('/setup-wizard') &&
           path != '/pantry/add') {
         final profile = ref.read(userProfileProvider).valueOrNull;
         if (profile != null && !profile.hasHousehold) {
@@ -71,6 +79,31 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/pantry/add',
         builder: (_, __) => const PantryItemFormScreen(),
       ),
+      GoRoute(
+        path: '/plans/add',
+        builder: (_, __) => const PlanFormScreen(),
+      ),
+      GoRoute(
+        path: '/setup-wizard',
+        builder: (context, state) {
+          final householdId = state.uri.queryParameters['householdId'] ?? '';
+          return SetupWizardScreen(householdId: householdId);
+        },
+      ),
+      GoRoute(
+        path: '/subscriptions/add',
+        builder: (_, __) => const SubscriptionFormScreen(),
+      ),
+      GoRoute(
+        path: '/subscriptions/edit',
+        builder: (context, state) {
+          final id = state.uri.queryParameters['id'] ?? '';
+          return SubscriptionFormScreen(subscriptionId: id);
+        },
+      ),
+      GoRoute(path: '/expenses', redirect: (_, __) => '/more/expenses'),
+      GoRoute(path: '/shop', redirect: (_, __) => '/more/shop'),
+      GoRoute(path: '/subscriptions', redirect: (_, __) => '/more/subscriptions'),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return HomeShell(navigationShell: navigationShell);
@@ -88,7 +121,15 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/pantry',
-                builder: (_, __) => const PantryScreen(),
+                builder: (_, __) => const InventoryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/plans',
+                builder: (_, __) => const PlansScreen(),
               ),
             ],
           ),
@@ -103,16 +144,22 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/expenses',
-                builder: (_, __) => const ExpensesScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/shop',
-                builder: (_, __) => const ShoppingScreen(),
+                path: '/more',
+                builder: (_, __) => const MoreScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'expenses',
+                    builder: (_, __) => const ExpensesScreen(),
+                  ),
+                  GoRoute(
+                    path: 'shop',
+                    builder: (_, __) => const ShoppingScreen(),
+                  ),
+                  GoRoute(
+                    path: 'subscriptions',
+                    builder: (_, __) => const SubscriptionsScreen(),
+                  ),
+                ],
               ),
             ],
           ),

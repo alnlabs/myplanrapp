@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/models/shopping_list_item.dart';
@@ -54,6 +55,10 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/more'),
+        ),
         title: const Text(AppStrings.shopTitle),
         actions: [
           IconButton(

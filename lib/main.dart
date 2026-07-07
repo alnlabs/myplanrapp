@@ -10,6 +10,9 @@ import 'core/strings/app_strings.dart';
 import 'core/theme/app_theme.dart';
 import 'features/alerts/services/notification_service.dart';
 import 'features/auth/data/auth_repository.dart';
+import 'features/plans/data/plan_repository.dart';
+import 'features/subscriptions/data/subscription_repository.dart';
+import 'shared/widgets/myplanr_logo.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,7 +55,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
           return MaterialApp(
             theme: AppTheme.light,
             home: const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(child: MyPlanrLogo(height: 64)),
             ),
           );
         }
@@ -70,11 +73,34 @@ class _BootstrapAppState extends State<BootstrapApp> {
   }
 }
 
-class MyPlanrApp extends ConsumerWidget {
+class MyPlanrApp extends ConsumerStatefulWidget {
   const MyPlanrApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyPlanrApp> createState() => _MyPlanrAppState();
+}
+
+class _MyPlanrAppState extends ConsumerState<MyPlanrApp> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _rescheduleReminders());
+  }
+
+  Future<void> _rescheduleReminders() async {
+    try {
+      final profile = await ref.read(userProfileProvider.future);
+      final householdId = profile?.activeHouseholdId;
+      if (householdId == null) return;
+      await Future.wait([
+        ref.read(planRepositoryProvider).rescheduleAllReminders(householdId),
+        ref.read(subscriptionRepositoryProvider).rescheduleAllReminders(householdId),
+      ]);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
 
     ref.listen<AsyncValue<AuthState>>(authStateProvider, (previous, next) {
@@ -82,6 +108,7 @@ class MyPlanrApp extends ConsumerWidget {
       final hasSession = next.valueOrNull?.session != null;
       if (!hadSession && hasSession) {
         ref.invalidate(userProfileProvider);
+        _rescheduleReminders();
       }
       if (hadSession && !hasSession) {
         router.go('/login');

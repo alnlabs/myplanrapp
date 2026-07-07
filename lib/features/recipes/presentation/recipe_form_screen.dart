@@ -6,6 +6,7 @@ import '../../../shared/constants/pantry_constants.dart';
 import '../../../shared/models/pantry_item.dart';
 import '../../../shared/models/recipe.dart';
 import '../../../shared/utils/api_error_formatter.dart';
+import '../../../shared/utils/offline_guard.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
@@ -63,6 +64,7 @@ class _RecipeFormScreenState extends ConsumerState<RecipeFormScreen> {
       _error = null;
     });
     try {
+      ref.ensureOnline();
       final profile = await ref.read(userProfileProvider.future);
       final householdId = profile?.activeHouseholdId;
       if (householdId == null) throw Exception(AppStrings.noHousehold);

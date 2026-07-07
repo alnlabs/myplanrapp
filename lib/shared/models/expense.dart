@@ -26,6 +26,7 @@ class Expense {
     this.note,
     this.categoryName,
     this.pantryItemId,
+    this.createdBy,
   });
 
   final String id;
@@ -37,6 +38,7 @@ class Expense {
   final String? note;
   final String? categoryName;
   final String? pantryItemId;
+  final String? createdBy;
 
   factory Expense.fromJson(Map<String, dynamic> json) {
     final category = json['expense_categories'] as Map<String, dynamic>?;
@@ -50,6 +52,7 @@ class Expense {
       note: json['note'] as String?,
       categoryName: category?['name'] as String?,
       pantryItemId: json['pantry_item_id'] as String?,
+      createdBy: json['created_by'] as String?,
     );
   }
 }

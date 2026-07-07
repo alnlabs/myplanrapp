@@ -1,4 +1,4 @@
-package com.myplanr.myplanr
+package com.alnlabs.myplanr
 
 import io.flutter.embedding.android.FlutterActivity
 

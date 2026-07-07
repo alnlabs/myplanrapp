@@ -5,6 +5,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../shared/models/expense.dart';
 import '../../../shared/models/pantry_item.dart';
 import '../../../shared/utils/api_error_formatter.dart';
+import '../../../shared/utils/offline_guard.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
@@ -70,6 +71,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _error = null;
     });
     try {
+      ref.ensureOnline();
       final profile = await ref.read(userProfileProvider.future);
       final householdId = profile?.activeHouseholdId;
       if (householdId == null) throw Exception(AppStrings.noHousehold);

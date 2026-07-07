@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/strings/app_strings.dart';
+import '../../../core/providers/supabase_providers.dart';
 import '../../../shared/models/expense.dart';
+import '../../../shared/providers/record_permissions.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/async_screen_body.dart';
@@ -21,6 +24,10 @@ class ExpensesScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/more'),
+        ),
         title: const Text(AppStrings.expensesTitle),
         actions: [
           IconButton(
@@ -101,6 +108,9 @@ class _ExpenseList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currentUserId = ref.watch(currentUserIdProvider);
+    final isOwner = ref.watch(isHouseholdOwnerProvider);
+    final memberNames = ref.watch(memberNamesProvider);
     final grouped = <String, List<Expense>>{};
     for (final expense in expenses) {
       final key = Formatters.date(expense.expenseDate);
@@ -114,13 +124,28 @@ class _ExpenseList extends ConsumerWidget {
           children: [
             SectionHeader(title: entry.key),
             ...entry.value.map(
-              (expense) => Card(
+              (expense) {
+                final canEdit = canManageRecord(
+                  createdBy: expense.createdBy,
+                  currentUserId: currentUserId,
+                  isOwner: isOwner,
+                );
+                final creatorName = expense.createdBy != null
+                    ? memberNames[expense.createdBy]
+                    : null;
+                return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: ListTile(
                   title: Text(expense.title),
-                  subtitle: Text(expense.categoryName ?? ''),
+                  subtitle: Text(
+                    [
+                      if (expense.categoryName != null) expense.categoryName!,
+                      if (creatorName != null) AppStrings.addedBy(creatorName),
+                    ].join(' · '),
+                  ),
                   trailing: Text(Formatters.currency(expense.amount)),
-                  onTap: () async {
+                  onTap: canEdit
+                      ? () async {
                     final updated = await Navigator.of(context).push<bool>(
                       MaterialPageRoute<bool>(
                         builder: (_) => AddExpenseScreen(expense: expense),
@@ -130,8 +155,10 @@ class _ExpenseList extends ConsumerWidget {
                       ref.invalidate(expensesProvider);
                       ref.invalidate(expenseSummaryProvider);
                     }
-                  },
-                  onLongPress: () async {
+                  }
+                      : null,
+                  onLongPress: canEdit
+                      ? () async {
                     final confirmed = await showConfirmDialog(
                       context,
                       title: AppStrings.delete,
@@ -142,9 +169,11 @@ class _ExpenseList extends ConsumerWidget {
                         .deleteExpense(expense.id);
                     ref.invalidate(expensesProvider);
                     ref.invalidate(expenseSummaryProvider);
-                  },
+                  }
+                      : null,
                 ),
-              ),
+              );
+              },
             ),
           ],
         );

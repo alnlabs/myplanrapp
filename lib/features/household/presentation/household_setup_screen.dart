@@ -8,7 +8,7 @@ import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
 import '../../auth/data/auth_repository.dart';
-import '../../recipes/data/recipe_repository.dart';
+import '../data/family_repository.dart';
 import '../data/household_repository.dart';
 
 class HouseholdSetupScreen extends ConsumerStatefulWidget {
@@ -41,12 +41,10 @@ class _HouseholdSetupScreenState extends ConsumerState<HouseholdSetupScreen> {
       final householdId = await ref
           .read(householdRepositoryProvider)
           .createHousehold(_nameController.text.trim());
-      await ref
-          .read(recipeRepositoryProvider)
-          .seedDefaultRecipes(householdId);
       ref.invalidate(userProfileProvider);
       ref.invalidate(activeHouseholdProvider);
-      if (mounted) context.go('/home');
+      ref.invalidate(familyRosterProvider);
+      if (mounted) context.go('/setup-wizard?householdId=$householdId');
     } catch (e) {
       setState(() => _error = ApiErrorFormatter.format(e));
     } finally {
@@ -63,6 +61,7 @@ class _HouseholdSetupScreenState extends ConsumerState<HouseholdSetupScreen> {
       await ref.read(householdRepositoryProvider).acceptInvite(householdId);
       ref.invalidate(userProfileProvider);
       ref.invalidate(activeHouseholdProvider);
+      ref.invalidate(familyRosterProvider);
       if (mounted) context.go('/home');
     } catch (e) {
       setState(() => _error = ApiErrorFormatter.format(e));

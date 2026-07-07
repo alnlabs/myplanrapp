@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-label="MyPlanr">
+  <rect width="512" height="512" rx="108" fill="#0D9488"/>
+  <path d="M256 104L404 248V376H108V248L256 104Z" fill="white"/>
+  <rect x="148" y="248" width="216" height="128" rx="12" fill="#0D9488"/>
+  <path d="M196 300L228 332L316 244" stroke="white" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

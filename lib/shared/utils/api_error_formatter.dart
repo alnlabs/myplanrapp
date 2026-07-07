@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/strings/app_strings.dart';
+import 'offline_guard.dart';
 
 class ApiErrorFormatter {
   ApiErrorFormatter._();
@@ -13,6 +14,9 @@ class ApiErrorFormatter {
   static String format(Object? error, {String fallback = defaultMessage}) {
     if (error == null) return fallback;
 
+    if (error is OfflineException) {
+      return error.message;
+    }
     if (error is AuthException) {
       return _clean(error.message, fallback);
     }

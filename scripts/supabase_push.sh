@@ -30,7 +30,16 @@ fi
 
 PROJECT_REF="${SUPABASE_URL#https://}"
 PROJECT_REF="${PROJECT_REF%%.supabase.co}"
-DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${PROJECT_REF}.supabase.co:5432/postgres"
+
+if [[ -n "${SUPABASE_DB_URL:-}" ]]; then
+  DB_URL="$SUPABASE_DB_URL"
+elif [[ -n "${SUPABASE_POOLER_URL:-}" ]]; then
+  DB_URL="$SUPABASE_POOLER_URL"
+else
+  DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${PROJECT_REF}.supabase.co:5432/postgres"
+fi
+
+echo "Using DB host: ${DB_URL#*@}"
 
 supabase db push --db-url "$DB_URL" --yes
 echo "Done. Check: supabase migration list --db-url \"\$DB_URL\""

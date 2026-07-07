@@ -7,6 +7,7 @@ import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
+import '../../../shared/widgets/myplanr_logo.dart';
 import '../data/auth_repository.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -68,6 +69,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const Center(child: MyPlanrLogo(height: 80)),
+                const SizedBox(height: 32),
                 AppTextField(
                   controller: _email,
                   label: AppStrings.email,
