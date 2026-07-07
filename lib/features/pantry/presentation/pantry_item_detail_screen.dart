@@ -45,12 +45,16 @@ class PantryItemDetailScreen extends ConsumerWidget {
         actions: [
           IconButton(
             onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute<void>(
+              final updated = await Navigator.of(context).push<bool>(
+                MaterialPageRoute<bool>(
                   builder: (_) => PantryItemFormScreen(item: item),
                 ),
               );
-              if (context.mounted) Navigator.pop(context);
+              if (updated == true && context.mounted) {
+                ref.invalidate(pantryItemsProvider);
+                ref.invalidate(lowStockItemsProvider);
+                Navigator.pop(context);
+              }
             },
             icon: const Icon(Icons.edit_outlined),
           ),
@@ -73,6 +77,10 @@ class PantryItemDetailScreen extends ConsumerWidget {
                     Formatters.quantity(item.quantity, item.unit),
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
+                  if (item.brandLabel != null) ...[
+                    const SizedBox(height: 8),
+                    Text('${AppStrings.brand}: ${item.brandLabel}'),
+                  ],
                   if (item.category != null) ...[
                     const SizedBox(height: 8),
                     Text(item.category!),
@@ -125,7 +133,7 @@ class PantryItemDetailScreen extends ConsumerWidget {
             value: eventsAsync,
             onRetry: () => ref.invalidate(stockEventsProvider(item.id)),
             isEmpty: (events) => events.isEmpty,
-            emptyTitle: 'No history yet',
+            emptyTitle: AppStrings.emptyStockHistory,
             builder: (events) {
               return Column(
                 children: events.map((event) {

@@ -24,7 +24,6 @@ final isHouseholdOwnerProvider = Provider<bool>((ref) {
 final memberNamesProvider = Provider<Map<String, String>>((ref) {
   final members = ref.watch(householdMembersProvider).valueOrNull ?? [];
   return {
-    for (final m in members)
-      if (m.displayName != null) m.userId: m.displayName!,
+    for (final m in members) m.userId: m.listLabel,
   };
 });

@@ -7,7 +7,6 @@ import '../../../shared/widgets/async_screen_body.dart';
 import '../../../shared/widgets/status_chip.dart';
 import '../../pantry/data/pantry_repository.dart';
 import '../../shopping/data/shopping_repository.dart';
-import '../services/notification_service.dart';
 
 class AlertsScreen extends ConsumerWidget {
   const AlertsScreen({super.key});
@@ -27,16 +26,10 @@ class AlertsScreen extends ConsumerWidget {
           value: lowStockAsync,
           onRetry: () => ref.invalidate(lowStockItemsProvider),
           isEmpty: (items) => items.isEmpty,
+          emptyIcon: Icons.inventory_2_outlined,
           emptyTitle: AppStrings.emptyAlerts,
           emptySubtitle: AppStrings.emptyAlertsHint,
           builder: (items) {
-            for (final item in items) {
-              NotificationService.instance.showLowStockAlert(
-                itemId: item.id,
-                title: AppStrings.alertsTitle,
-                body: '${item.name} is running low (${Formatters.quantity(item.quantity, item.unit)} left)',
-              );
-            }
             return ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: items.length,
@@ -45,8 +38,16 @@ class AlertsScreen extends ConsumerWidget {
                 final item = items[index];
                 return Card(
                   child: ListTile(
-                    title: Text(item.name),
-                    subtitle: Text(Formatters.quantity(item.quantity, item.unit)),
+                    title: Text(
+                      item.brandLabel != null
+                          ? '${item.name} (${item.brandLabel})'
+                          : item.name,
+                    ),
+                    subtitle: Text(
+                      item.lowStockThreshold != null
+                          ? '${Formatters.quantity(item.quantity, item.unit)} · ${AppStrings.lowStockAlert} ${Formatters.quantity(item.lowStockThreshold!, item.effectiveLowStockUnit)}'
+                          : Formatters.quantity(item.quantity, item.unit),
+                    ),
                     trailing: item.isOutOfStock
                         ? const StatusChip(type: StatusChipType.outOfStock)
                         : const StatusChip(type: StatusChipType.lowStock),

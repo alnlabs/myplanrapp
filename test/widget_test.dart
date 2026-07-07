@@ -21,6 +21,12 @@ void main() {
       expect(Validators.positiveAmount('0'), isNotNull);
       expect(Validators.positiveAmount('80'), isNull);
     });
+
+    test('confirmPassword requires match', () {
+      expect(Validators.confirmPassword(null, 'secret'), isNotNull);
+      expect(Validators.confirmPassword('other', 'secret'), isNotNull);
+      expect(Validators.confirmPassword('secret', 'secret'), isNull);
+    });
   });
 
   testWidgets('ProviderScope smoke test', (tester) async {

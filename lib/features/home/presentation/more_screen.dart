@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/strings/app_strings.dart';
-import '../../../shared/constants/household_modules.dart';
+import '../../../shared/constants/nav_features.dart';
+import '../../../shared/widgets/secret_tap.dart';
+import '../../feedback/presentation/feedback_screen.dart';
 import '../../household/data/household_settings_repository.dart';
 import '../../household/presentation/household_screen.dart';
-import '../../profile/presentation/profile_screen.dart';
+import '../../settings/presentation/settings_screen.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -14,93 +16,209 @@ class MoreScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final modules = ref.watch(enabledModulesProvider);
+    final theme = Theme.of(context);
+    final overflow = NavFeatures.overflowFeatures(modules);
 
-    final items = <_MoreItem>[
-      if (modules.contains(HouseholdModules.expenses))
-        _MoreItem(
-          icon: Icons.payments_outlined,
-          title: AppStrings.navExpenses,
-          subtitle: AppStrings.moreExpensesHint,
-          route: '/more/expenses',
-        ),
-      if (modules.contains(HouseholdModules.shopping))
-        _MoreItem(
-          icon: Icons.shopping_cart_outlined,
-          title: AppStrings.navShop,
-          subtitle: AppStrings.moreShopHint,
-          route: '/more/shop',
-        ),
-      if (modules.contains(HouseholdModules.subscriptions))
-        _MoreItem(
-          icon: Icons.subscriptions_outlined,
-          title: AppStrings.subscriptionsTitle,
-          subtitle: AppStrings.moreSubscriptionsHint,
-          route: '/more/subscriptions',
-        ),
-      _MoreItem(
+    final overflowItems = overflow
+        .map(
+          (feature) => _MoreTile(
+            icon: feature.icon,
+            color: theme.colorScheme.primary,
+            title: feature.label,
+            subtitle: feature.hint,
+            onTap: () => context.go(feature.path),
+          ),
+        )
+        .toList();
+
+    final householdItems = <_MoreTile>[
+      _MoreTile(
         icon: Icons.family_restroom_outlined,
+        color: theme.colorScheme.primary,
         title: AppStrings.householdTitle,
         subtitle: AppStrings.moreFamilyHint,
-        route: null,
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const HouseholdScreen()),
         ),
       ),
-      _MoreItem(
-        icon: Icons.person_outline,
-        title: AppStrings.profileTitle,
-        subtitle: AppStrings.moreProfileHint,
-        route: null,
+    ];
+
+    final appItems = <_MoreTile>[
+      _MoreTile(
+        icon: Icons.settings_outlined,
+        color: Colors.blueGrey,
+        title: AppStrings.settingsTitle,
+        subtitle: AppStrings.moreSettingsHint,
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const ProfileScreen()),
+          MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+        ),
+      ),
+      _MoreTile(
+        icon: Icons.feedback_outlined,
+        color: Colors.green,
+        title: AppStrings.feedbackTitle,
+        subtitle: AppStrings.moreFeedbackHint,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const FeedbackScreen()),
         ),
       ),
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text(AppStrings.navMore)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            AppStrings.moreSubtitle,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppStrings.navMore,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    SecretTap(
+                      child: Text(
+                        AppStrings.moreSubtitle,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-          ),
-          const SizedBox(height: 16),
-          ...items.map(
-            (item) => Card(
-              child: ListTile(
-                leading: Icon(item.icon),
-                title: Text(item.title),
-                subtitle: Text(item.subtitle),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: item.onTap ??
-                    () {
-                      if (item.route != null) context.go(item.route!);
-                    },
               ),
             ),
           ),
+          if (overflowItems.isNotEmpty)
+            _Section(
+              title: AppStrings.moreSectionFeatures,
+              items: overflowItems,
+            ),
+          _Section(
+            title: AppStrings.moreSectionHousehold,
+            items: householdItems,
+          ),
+          _Section(
+            title: AppStrings.moreSectionApp,
+            items: appItems,
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
     );
   }
 }
 
-class _MoreItem {
-  const _MoreItem({
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.items});
+
+  final String title;
+  final List<_MoreTile> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      sliver: SliverToBoxAdapter(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) const SizedBox(height: 8),
+              items[i],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MoreTile extends StatelessWidget {
+  const _MoreTile({
     required this.icon,
+    required this.color,
     required this.title,
     required this.subtitle,
-    this.route,
-    this.onTap,
+    required this.onTap,
   });
 
   final IconData icon;
+  final Color color;
   final String title;
   final String subtitle;
-  final String? route;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

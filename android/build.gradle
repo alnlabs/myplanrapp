@@ -12,6 +12,13 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 }
+subprojects { subproject ->
+    subproject.pluginManager.withPlugin("kotlin-android") {
+        subproject.dependencies {
+            implementation "androidx.core:core-ktx:1.15.0"
+        }
+    }
+}
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir

@@ -10,6 +10,7 @@ import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/family_repository.dart';
+import '../data/household_repository.dart';
 
 enum AddMemberKind { inviteApp, profileOnly }
 
@@ -80,6 +81,7 @@ class _AddFamilyMemberScreenState extends ConsumerState<AddFamilyMemberScreen> {
       }
 
       ref.invalidate(familyRosterProvider);
+      ref.invalidate(sentPendingInvitesProvider);
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(

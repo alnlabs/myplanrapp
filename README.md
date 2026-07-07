@@ -32,6 +32,17 @@ Or install the [Supabase CLI](https://github.com/supabase/cli/releases) and run 
 
 4. Enable Email auth in Authentication → Providers
 
+5. **Fix auth email links** (required for mobile — stops `localhost` in confirmation emails):
+
+   In Supabase Dashboard → **Authentication** → **URL Configuration**:
+
+   - **Site URL:** `com.alnlabs.myplanr://login-callback`
+   - **Redirect URLs** (add both):
+     - `com.alnlabs.myplanr://login-callback`
+     - `com.alnlabs.myplanr://login-callback/**`
+
+   The app passes this deep link on sign-up and password reset. Tapping the email link opens MyPlanr and completes verification.
+
 ### 2. App config
 
 ```bash

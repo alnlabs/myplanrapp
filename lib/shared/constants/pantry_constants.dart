@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class PantryUnits {
   PantryUnits._();
 
@@ -26,6 +28,29 @@ class PantryUnits {
       _ => unit,
     };
   }
+
+  /// Unit family for cross-unit comparisons (mass, volume, count).
+  static String family(String unit) {
+    return switch (unit) {
+      'g' || 'kg' => 'mass',
+      'ml' || 'L' => 'volume',
+      _ => 'count',
+    };
+  }
+
+  /// Units that can be compared with (and converted to/from) [unit].
+  static List<String> compatibleWith(String unit) {
+    final fam = family(unit);
+    return values.where((u) => family(u) == fam).toList();
+  }
+
+  /// Multiplier to convert [unit] to its family base (grams / ml / each).
+  static num baseFactor(String unit) {
+    return switch (unit) {
+      'kg' || 'L' => 1000,
+      _ => 1,
+    };
+  }
 }
 
 class PantryCategories {
@@ -43,4 +68,19 @@ class PantryCategories {
     'Household',
     'Other',
   ];
+
+  static IconData iconFor(String? category) {
+    return switch (category) {
+      'Grains' => Icons.grass_outlined,
+      'Pulses' => Icons.grain_outlined,
+      'Spices' => Icons.local_fire_department_outlined,
+      'Dairy' => Icons.egg_outlined,
+      'Vegetables' => Icons.eco_outlined,
+      'Fruits' => Icons.apple_outlined,
+      'Oils' => Icons.water_drop_outlined,
+      'Snacks' => Icons.cookie_outlined,
+      'Household' => Icons.cleaning_services_outlined,
+      _ => Icons.kitchen_outlined,
+    };
+  }
 }

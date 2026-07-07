@@ -89,7 +89,7 @@ class SubscriptionRepository {
       return;
     }
 
-    final reminderAt = sub.reminderAt;
+    final reminderAt = sub.effectiveReminderAt;
     if (sub.isActive &&
         sub.reminderEnabled &&
         reminderAt != null &&

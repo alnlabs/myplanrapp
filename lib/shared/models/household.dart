@@ -1,3 +1,5 @@
+import '../utils/member_display_name.dart';
+
 class Household {
   const Household({
     required this.id,
@@ -24,12 +26,19 @@ class HouseholdMember {
     required this.userId,
     required this.role,
     this.displayName,
+    this.username,
   });
 
   final String id;
   final String userId;
   final String role;
   final String? displayName;
+  final String? username;
+
+  String get listLabel => memberListLabel(
+        profileDisplayName: displayName,
+        username: username,
+      );
 
   factory HouseholdMember.fromJson(Map<String, dynamic> json) {
     final profile = json['profiles'] as Map<String, dynamic>?;
@@ -38,6 +47,7 @@ class HouseholdMember {
       userId: json['user_id'] as String,
       role: json['role'] as String,
       displayName: profile?['display_name'] as String?,
+      username: profile?['username'] as String?,
     );
   }
 }

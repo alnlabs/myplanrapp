@@ -2,11 +2,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/config/legal_urls.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/utils/api_error_formatter.dart';
+import '../../../shared/utils/legal_launcher.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
@@ -23,8 +22,10 @@ class RegisterScreen extends ConsumerStatefulWidget {
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
+  final _username = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
   bool _loading = false;
   bool _acceptedTerms = false;
   String? _error;
@@ -32,20 +33,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   void dispose() {
     _name.dispose();
+    _username.dispose();
     _email.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     super.dispose();
-  }
-
-  Future<void> _openUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.errorGeneric)),
-        );
-      }
-    }
   }
 
   Future<void> _submit() async {
@@ -59,14 +51,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _error = null;
     });
     try {
-      await ref.read(authRepositoryProvider).signUp(
+      final res = await ref.read(authRepositoryProvider).signUp(
             _email.text.trim(),
             _password.text,
             _name.text.trim(),
+            username: _username.text.trim(),
           );
-      await ref.read(authRepositoryProvider).updateDisplayName(_name.text.trim());
       ref.invalidate(userProfileProvider);
-      if (mounted) context.go('/household-setup');
+      if (!mounted) return;
+      // No session means email confirmation is required before sign-in.
+      if (res.session == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.signUpVerifyEmail)),
+        );
+        context.go('/login');
+        return;
+      }
+      context.go('/household-setup');
     } catch (e) {
       setState(() => _error = ApiErrorFormatter.format(e));
     } finally {
@@ -100,17 +101,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
                 AppTextField(
+                  controller: _username,
+                  label: AppStrings.username,
+                  helperText: AppStrings.usernameHint,
+                  validator: Validators.username,
+                ),
+                const SizedBox(height: 16),
+                AppTextField(
                   controller: _email,
                   label: AppStrings.email,
                   validator: Validators.email,
                   keyboardType: TextInputType.emailAddress,
                 ),
                 const SizedBox(height: 16),
-                AppTextField(
+                AppPasswordField(
                   controller: _password,
                   label: AppStrings.password,
                   validator: Validators.password,
-                  obscureText: true,
+                  textInputAction: TextInputAction.next,
+                ),
+                const SizedBox(height: 16),
+                AppPasswordField(
+                  controller: _confirmPassword,
+                  label: AppStrings.confirmPassword,
+                  validator: (value) =>
+                      Validators.confirmPassword(value, _password.text),
+                  textInputAction: TextInputAction.done,
                 ),
                 const SizedBox(height: 8),
                 CheckboxListTile(
@@ -121,19 +137,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     text: TextSpan(
                       style: Theme.of(context).textTheme.bodyMedium,
                       children: [
-                        TextSpan(text: '${AppStrings.acceptTermsPrefix} '),
+                        const TextSpan(text: '${AppStrings.acceptTermsPrefix} '),
                         TextSpan(
                           text: AppStrings.termsOfService,
                           style: linkStyle,
                           recognizer: TapGestureRecognizer()
-                            ..onTap = () => _openUrl(LegalUrls.termsOfService),
+                            ..onTap = () => openTermsOfService(context),
                         ),
                         const TextSpan(text: ' and '),
                         TextSpan(
                           text: AppStrings.privacyPolicy,
                           style: linkStyle,
                           recognizer: TapGestureRecognizer()
-                            ..onTap = () => _openUrl(LegalUrls.privacyPolicy),
+                            ..onTap = () => openPrivacyPolicy(context),
                         ),
                       ],
                     ),

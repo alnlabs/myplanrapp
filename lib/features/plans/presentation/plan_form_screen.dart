@@ -5,6 +5,9 @@ import '../../../core/strings/app_strings.dart';
 import '../../../shared/constants/plan_constants.dart';
 import '../../../shared/models/plan.dart';
 import '../../../shared/utils/api_error_formatter.dart';
+import '../../../shared/utils/date_time_picker.dart';
+import '../../../shared/utils/formatters.dart';
+import '../../../shared/widgets/reminder_field.dart';
 import '../../../shared/utils/offline_guard.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
@@ -62,41 +65,12 @@ class _PlanFormScreenState extends ConsumerState<PlanFormScreen> {
   }
 
   Future<void> _pickDueDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _dueAt ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
+    final picked = await pickDateTime(
+      context,
+      initial: _dueAt ?? DateTime.now(),
     );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_dueAt ?? DateTime.now()),
-    );
-    if (time == null) return;
-    setState(() {
-      _dueAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    });
-  }
-
-  Future<void> _pickReminder() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _reminderAt ?? _dueAt ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
-    );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_reminderAt ?? DateTime.now()),
-    );
-    if (time == null) return;
-    setState(() {
-      _reminderAt =
-          DateTime(date.year, date.month, date.day, time.hour, time.minute);
-      _reminderEnabled = true;
-    });
+    if (picked == null || !mounted) return;
+    setState(() => _dueAt = picked);
   }
 
   Plan _buildPlan({Plan? existing}) {
@@ -231,36 +205,19 @@ class _PlanFormScreenState extends ConsumerState<PlanFormScreen> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text(AppStrings.dueDate),
                   subtitle: Text(
-                    _dueAt?.toLocal().toString().substring(0, 16) ??
-                        AppStrings.none,
+                    _dueAt != null
+                        ? Formatters.dateTime(_dueAt!.toLocal())
+                        : 'Tap to set date & time',
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.calendar_today_outlined),
-                    onPressed: _pickDueDate,
-                  ),
+                  trailing: const Icon(Icons.edit_calendar_outlined),
+                  onTap: _pickDueDate,
                 ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text(AppStrings.reminder),
-                  value: _reminderEnabled,
-                  onChanged: (v) => setState(() {
-                    _reminderEnabled = v;
-                    if (!v) _reminderAt = null;
-                  }),
+                ReminderField(
+                  enabled: _reminderEnabled,
+                  reminderAt: _reminderAt,
+                  onEnabledChanged: (value) => setState(() => _reminderEnabled = value),
+                  onReminderAtChanged: (value) => setState(() => _reminderAt = value),
                 ),
-                if (_reminderEnabled)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(AppStrings.reminderAt),
-                    subtitle: Text(
-                      _reminderAt?.toLocal().toString().substring(0, 16) ??
-                          'Tap to set',
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.alarm_outlined),
-                      onPressed: _pickReminder,
-                    ),
-                  ),
                 rosterAsync.when(
                   loading: () => const SizedBox.shrink(),
                   error: (_, __) => const SizedBox.shrink(),
@@ -281,7 +238,7 @@ class _PlanFormScreenState extends ConsumerState<PlanFormScreen> {
                             ...roster.map(
                               (m) => DropdownMenuItem(
                                 value: m.id,
-                                child: Text(m.displayName),
+                                child: Text(m.listLabel),
                               ),
                             ),
                           ],
@@ -301,7 +258,7 @@ class _PlanFormScreenState extends ConsumerState<PlanFormScreen> {
                             ...roster.map(
                               (m) => DropdownMenuItem(
                                 value: m.id,
-                                child: Text(m.displayName),
+                                child: Text(m.listLabel),
                               ),
                             ),
                           ],

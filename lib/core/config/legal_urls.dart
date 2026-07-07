@@ -1,5 +1,9 @@
-/// Public legal document URLs (open in browser from register screen).
+/// Legal document URLs hosted on the ALNLabs website.
 abstract final class LegalUrls {
-  static const termsOfService = 'https://myplanr.app/terms';
-  static const privacyPolicy = 'https://myplanr.app/privacy';
+  static final Uri termsOfService = Uri.parse(
+    'https://alnlabs.com/myplanr/terms-of-service',
+  );
+  static final Uri privacyPolicy = Uri.parse(
+    'https://alnlabs.com/myplanr/privacy-policy',
+  );
 }

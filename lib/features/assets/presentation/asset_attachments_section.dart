@@ -254,10 +254,10 @@ class _AttachmentTile extends ConsumerWidget {
         child: Center(child: CircularProgressIndicator()),
       ),
       error: (_, __) => _TileFrame(
-        child: const Icon(Icons.broken_image_outlined),
         label: attachment.fileName,
         canDelete: canDelete,
         onDelete: onDelete,
+        child: const Icon(Icons.broken_image_outlined),
       ),
       data: (url) => GestureDetector(
         onTap: () => Navigator.of(context).push(
@@ -266,12 +266,12 @@ class _AttachmentTile extends ConsumerWidget {
           ),
         ),
         child: _TileFrame(
-          child: attachment.isImage
-              ? Image.network(url, fit: BoxFit.cover)
-              : const Icon(Icons.picture_as_pdf_outlined, size: 40),
           label: AttachmentTypes.labelFor(attachment.attachmentType),
           canDelete: canDelete,
           onDelete: onDelete,
+          child: attachment.isImage
+              ? Image.network(url, fit: BoxFit.cover)
+              : const Icon(Icons.picture_as_pdf_outlined, size: 40),
         ),
       ),
     );

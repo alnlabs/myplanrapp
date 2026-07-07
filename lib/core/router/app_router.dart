@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/data/auth_repository.dart';
+import '../../features/auth/presentation/account_restore_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
@@ -18,6 +19,8 @@ import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/plans/presentation/plan_form_screen.dart';
 import '../../features/plans/presentation/plans_screen.dart';
 import '../../features/recipes/presentation/recipes_screen.dart';
+import '../../features/reminders/presentation/reminder_form_screen.dart';
+import '../../features/reminders/presentation/reminders_screen.dart';
 import '../../features/shopping/presentation/shopping_screen.dart';
 import '../../features/subscriptions/presentation/subscription_form_screen.dart';
 import '../../features/subscriptions/presentation/subscriptions_screen.dart';
@@ -26,6 +29,7 @@ import '../providers/supabase_providers.dart';
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
   final onboardingAsync = ref.watch(onboardingCompletedProvider);
+  final profileAsync = ref.watch(userProfileProvider);
 
   return GoRouter(
     initialLocation: '/onboarding',
@@ -33,27 +37,51 @@ final routerProvider = Provider<GoRouter>((ref) {
       final onboardingDone = onboardingAsync.valueOrNull ?? false;
       final session = authState.valueOrNull?.session;
       final path = state.matchedLocation;
-      final isAuthRoute =
-          path == '/login' || path == '/register' || path == '/forgot-password';
       final isOnboarding = path == '/onboarding';
+      final isAuthRoute =
+          path == '/login' ||
+          path == '/register' ||
+          path == '/forgot-password';
+      final isHouseholdSetup =
+          path == '/household-setup' || path.startsWith('/setup-wizard');
+      final isAccountRestore = path == '/account-restore';
 
-      if (!onboardingDone && !isOnboarding) return '/onboarding';
-      if (onboardingDone && isOnboarding) {
-        return session != null ? '/home' : '/login';
+      // On the onboarding screen, only leave once it's been completed.
+      // We never force other routes back to onboarding (avoids redirect
+      // loops when the completion flag is mid-write).
+      if (isOnboarding) {
+        if (!onboardingDone) return null;
+        if (session == null) return '/login';
+        final profile = profileAsync.valueOrNull;
+        if (profile?.isPendingDeletion == true) return '/account-restore';
+        if (profile != null && !profile.hasHousehold) {
+          return '/household-setup';
+        }
+        return '/home';
       }
-      if (session == null && !isAuthRoute && !isOnboarding) return '/login';
-      if (session != null && isAuthRoute) return '/home';
-      if (session != null &&
-          path != '/household-setup' &&
-          !path.startsWith('/home') &&
-          !path.startsWith('/pantry') &&
-          !path.startsWith('/recipes') &&
-          !path.startsWith('/more') &&
-          !path.startsWith('/plans') &&
-          !path.startsWith('/subscriptions') &&
-          !path.startsWith('/setup-wizard') &&
-          path != '/pantry/add') {
-        final profile = ref.read(userProfileProvider).valueOrNull;
+
+      // Not signed in: only auth/legal routes are reachable.
+      if (session == null) {
+        return isAuthRoute ? null : '/login';
+      }
+
+      final profile = profileAsync.valueOrNull;
+
+      // Soft-deleted account still within grace period: must restore or sign out.
+      if (profile?.isPendingDeletion == true && !isAccountRestore) {
+        return '/account-restore';
+      }
+
+      // Signed in but sitting on an auth route: move into the app.
+      if (isAuthRoute) {
+        if (profile != null && !profile.hasHousehold) {
+          return '/household-setup';
+        }
+        return '/home';
+      }
+
+      // Signed in with no family: force family creation first.
+      if (!isHouseholdSetup && !isAccountRestore) {
         if (profile != null && !profile.hasHousehold) {
           return '/household-setup';
         }
@@ -66,6 +94,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const OnboardingScreen(),
       ),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      GoRoute(
+        path: '/account-restore',
+        builder: (_, __) => const AccountRestoreScreen(),
+      ),
       GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
       GoRoute(
         path: '/forgot-password',
@@ -101,9 +133,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           return SubscriptionFormScreen(subscriptionId: id);
         },
       ),
-      GoRoute(path: '/expenses', redirect: (_, __) => '/more/expenses'),
-      GoRoute(path: '/shop', redirect: (_, __) => '/more/shop'),
-      GoRoute(path: '/subscriptions', redirect: (_, __) => '/more/subscriptions'),
+      GoRoute(
+        path: '/reminders/add',
+        builder: (_, __) => const ReminderFormScreen(),
+      ),
+      GoRoute(
+        path: '/reminders/edit',
+        builder: (context, state) {
+          final id = state.uri.queryParameters['id'] ?? '';
+          return ReminderFormScreen(standaloneId: id);
+        },
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return HomeShell(navigationShell: navigationShell);
@@ -136,6 +176,30 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/expenses',
+                builder: (_, __) => const ExpensesScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/subscriptions',
+                builder: (_, __) => const SubscriptionsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/reminders',
+                builder: (_, __) => const RemindersScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/recipes',
                 builder: (_, __) => const RecipesScreen(),
               ),
@@ -144,22 +208,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/shop',
+                builder: (_, __) => const ShoppingScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/more',
                 builder: (_, __) => const MoreScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'expenses',
-                    builder: (_, __) => const ExpensesScreen(),
-                  ),
-                  GoRoute(
-                    path: 'shop',
-                    builder: (_, __) => const ShoppingScreen(),
-                  ),
-                  GoRoute(
-                    path: 'subscriptions',
-                    builder: (_, __) => const SubscriptionsScreen(),
-                  ),
-                ],
               ),
             ],
           ),

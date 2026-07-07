@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/strings/app_strings.dart';
-import '../../../shared/constants/household_modules.dart';
+import '../../../shared/constants/nav_features.dart';
 import '../../../shared/widgets/offline_banner.dart';
 import '../../household/data/household_settings_repository.dart';
 
@@ -15,73 +15,75 @@ class HomeShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final modules = ref.watch(enabledModulesProvider);
+    final barFeatures = NavFeatures.bottomBarFeatures(modules);
+    final showMore = NavFeatures.showMoreTab(modules);
 
-    final allTabs = <_NavTab>[
-      _NavTab(
-        branchIndex: 0,
-        destination: const NavigationDestination(
+    final tabs = <_NavTab>[
+      const _NavTab(
+        branchIndex: NavFeatures.homeBranchIndex,
+        destination: NavigationDestination(
           icon: Icon(Icons.home_outlined),
           selectedIcon: Icon(Icons.home),
           label: AppStrings.navHome,
         ),
-        isVisible: (_) => true,
       ),
-      _NavTab(
-        branchIndex: 1,
-        destination: const NavigationDestination(
-          icon: Icon(Icons.inventory_2_outlined),
-          selectedIcon: Icon(Icons.inventory_2),
-          label: AppStrings.navInventory,
+      ...barFeatures.map(
+        (feature) => _NavTab(
+          branchIndex: feature.branchIndex,
+          destination: NavigationDestination(
+            icon: Icon(feature.icon),
+            selectedIcon: Icon(feature.selectedIcon),
+            label: feature.label,
+          ),
         ),
-        isVisible: (m) => m.contains(HouseholdModules.pantry),
       ),
-      _NavTab(
-        branchIndex: 2,
-        destination: const NavigationDestination(
-          icon: Icon(Icons.event_note_outlined),
-          selectedIcon: Icon(Icons.event_note),
-          label: AppStrings.navPlans,
+      if (showMore)
+        const _NavTab(
+          branchIndex: NavFeatures.moreBranchIndex,
+          destination: NavigationDestination(
+            icon: Icon(Icons.more_horiz_outlined),
+            selectedIcon: Icon(Icons.more_horiz),
+            label: AppStrings.navMore,
+          ),
         ),
-        isVisible: (m) => m.contains(HouseholdModules.plans),
-      ),
-      _NavTab(
-        branchIndex: 3,
-        destination: const NavigationDestination(
-          icon: Icon(Icons.menu_book_outlined),
-          selectedIcon: Icon(Icons.menu_book),
-          label: AppStrings.navRecipes,
-        ),
-        isVisible: (m) => m.contains(HouseholdModules.recipes),
-      ),
-      _NavTab(
-        branchIndex: 4,
-        destination: const NavigationDestination(
-          icon: Icon(Icons.more_horiz_outlined),
-          selectedIcon: Icon(Icons.more_horiz),
-          label: AppStrings.navMore,
-        ),
-        isVisible: (_) => true,
-      ),
     ];
 
-    final visibleTabs = allTabs.where((t) => t.isVisible(modules)).toList();
-    var selectedVisibleIndex = visibleTabs.indexWhere(
+    var selectedIndex = tabs.indexWhere(
       (t) => t.branchIndex == navigationShell.currentIndex,
     );
-    if (selectedVisibleIndex < 0) selectedVisibleIndex = 0;
+    if (selectedIndex < 0) selectedIndex = 0;
 
     return Scaffold(
       body: OfflineBanner(child: navigationShell),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedVisibleIndex,
-        onDestinationSelected: (index) {
-          final tab = visibleTabs[index];
-          navigationShell.goBranch(
-            tab.branchIndex,
-            initialLocation: tab.branchIndex == navigationShell.currentIndex,
-          );
-        },
-        destinations: visibleTabs.map((t) => t.destination).toList(),
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).shadowColor.withOpacity(0.12),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+            BoxShadow(
+              color: Theme.of(context).shadowColor.withOpacity(0.06),
+              blurRadius: 20,
+              offset: const Offset(0, -8),
+            ),
+          ],
+        ),
+        child: NavigationBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (index) {
+            final tab = tabs[index];
+            navigationShell.goBranch(
+              tab.branchIndex,
+              initialLocation: tab.branchIndex == navigationShell.currentIndex,
+            );
+          },
+          destinations: tabs.map((t) => t.destination).toList(),
+        ),
       ),
     );
   }
@@ -91,10 +93,8 @@ class _NavTab {
   const _NavTab({
     required this.branchIndex,
     required this.destination,
-    required this.isVisible,
   });
 
   final int branchIndex;
   final NavigationDestination destination;
-  final bool Function(Set<String> modules) isVisible;
 }

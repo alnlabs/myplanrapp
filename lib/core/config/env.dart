@@ -8,4 +8,12 @@ class Env {
       supabaseUrl.isNotEmpty &&
       supabaseAnonKey.isNotEmpty &&
       !supabaseUrl.contains('your-project');
+
+  /// PIN required to open in-app diagnostic logs (set in .env).
+  static String get diagnosticLogsPin => dotenv.env['DIAGNOSTIC_LOGS_PIN'] ?? '';
+
+  static bool get isLogsPinConfigured => diagnosticLogsPin.isNotEmpty;
+
+  static bool matchesLogsPin(String input) =>
+      isLogsPinConfigured && input == diagnosticLogsPin;
 }

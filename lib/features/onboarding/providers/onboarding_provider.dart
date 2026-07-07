@@ -14,6 +14,11 @@ Future<void> setOnboardingCompleted() async {
   await prefs.setBool(_onboardingKey, true);
 }
 
+Future<void> resetOnboarding() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool(_onboardingKey, false);
+}
+
 Future<bool> readOnboardingCompleted() async {
   final prefs = await SharedPreferences.getInstance();
   return prefs.getBool(_onboardingKey) ?? false;

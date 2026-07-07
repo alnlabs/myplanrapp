@@ -17,22 +17,40 @@ class ApiErrorFormatter {
     if (error is OfflineException) {
       return error.message;
     }
-    if (error is AuthException) {
-      return _clean(error.message, fallback);
-    }
-    if (error is PostgrestException) {
-      return _fromPostgrest(error, fallback);
-    }
     if (error is SocketException) {
       return AppStrings.errorNetwork;
     }
     if (error is TimeoutException) {
       return 'Request timed out. Please try again.';
     }
+    // Supabase/HTTP wrap connectivity failures in their own exception types
+    // (AuthRetryableFetchException, ClientException) rather than SocketException.
+    if (_looksLikeNetworkError(error)) {
+      return AppStrings.errorNetwork;
+    }
+    if (error is AuthException) {
+      return _clean(error.message, fallback);
+    }
+    if (error is PostgrestException) {
+      return _fromPostgrest(error, fallback);
+    }
 
     final text = error.toString();
     if (_looksTechnical(text)) return fallback;
     return _clean(text, fallback);
+  }
+
+  static bool _looksLikeNetworkError(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('socketexception') ||
+        text.contains('failed host lookup') ||
+        text.contains('clientexception') ||
+        text.contains('connection closed') ||
+        text.contains('connection refused') ||
+        text.contains('network is unreachable') ||
+        text.contains('no address associated with hostname') ||
+        text.contains('retryablefetch') ||
+        text.contains('handshakeexception');
   }
 
   static String _fromPostgrest(PostgrestException error, String fallback) {

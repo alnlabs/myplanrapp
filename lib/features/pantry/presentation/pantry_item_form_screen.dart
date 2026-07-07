@@ -10,6 +10,7 @@ import '../../../shared/utils/validators.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
+import '../../../shared/widgets/quantity_with_unit_field.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/pantry_repository.dart';
 
@@ -26,9 +27,11 @@ class PantryItemFormScreen extends ConsumerStatefulWidget {
 class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
+  late final TextEditingController _brand;
   late final TextEditingController _quantity;
   late final TextEditingController _threshold;
   late String _unit;
+  late String _lowStockUnit;
   String? _category;
   DateTime? _expiryDate;
   bool _loading = false;
@@ -40,6 +43,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
   void initState() {
     super.initState();
     _name = TextEditingController(text: widget.item?.name ?? '');
+    _brand = TextEditingController(text: widget.item?.brand ?? '');
     _quantity = TextEditingController(
       text: widget.item?.quantity.toString() ?? '',
     );
@@ -47,6 +51,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
       text: widget.item?.lowStockThreshold?.toString() ?? '',
     );
     _unit = widget.item?.unit ?? 'kg';
+    _lowStockUnit = widget.item?.lowStockUnit ?? _unit;
     _category = widget.item?.category;
     _expiryDate = widget.item?.expiryDate;
   }
@@ -54,6 +59,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
   @override
   void dispose() {
     _name.dispose();
+    _brand.dispose();
     _quantity.dispose();
     _threshold.dispose();
     super.dispose();
@@ -75,11 +81,13 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
         id: widget.item?.id ?? '',
         householdId: householdId,
         name: _name.text.trim(),
+        brand: _brand.text.trim().isEmpty ? null : _brand.text.trim(),
         quantity: double.parse(_quantity.text.trim()),
         unit: _unit,
         lowStockThreshold: _threshold.text.trim().isEmpty
             ? null
             : double.parse(_threshold.text.trim()),
+        lowStockUnit: _lowStockUnit,
         category: _category,
         expiryDate: _expiryDate,
       );
@@ -122,28 +130,30 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
                 ),
                 const SizedBox(height: 16),
                 AppTextField(
+                  controller: _brand,
+                  label: AppStrings.brandOptional,
+                ),
+                const SizedBox(height: 16),
+                QuantityWithUnitField(
                   controller: _quantity,
                   label: AppStrings.quantity,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  unit: _unit,
+                  onUnitChanged: (v) => setState(() {
+                    _unit = v;
+                    if (PantryUnits.family(_lowStockUnit) !=
+                        PantryUnits.family(v)) {
+                      _lowStockUnit = v;
+                    }
+                  }),
                   validator: Validators.positiveNumber,
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _unit,
-                  decoration: const InputDecoration(labelText: AppStrings.unit),
-                  items: PantryUnits.values
-                      .map((u) => DropdownMenuItem(
-                            value: u,
-                            child: Text(PantryUnits.displayLabel(u)),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setState(() => _unit = v ?? 'kg'),
-                ),
-                const SizedBox(height: 16),
-                AppTextField(
+                QuantityWithUnitField(
                   controller: _threshold,
                   label: AppStrings.lowStockAlert,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  unit: _lowStockUnit,
+                  unitOptions: PantryUnits.compatibleWith(_unit),
+                  onUnitChanged: (v) => setState(() => _lowStockUnit = v),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(

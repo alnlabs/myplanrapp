@@ -1,0 +1,32 @@
+MyPlanr — Terms of Service
+Last updated: July 2026
+
+1. Acceptance
+By creating an account or using MyPlanr, you agree to these Terms of Service.
+
+2. Service description
+MyPlanr is a household management app for inventory, expenses, recipes, plans, shopping lists, and family profiles. Features may change as the product evolves.
+
+3. Your account
+You are responsible for keeping your login credentials secure and for activity under your account. Provide accurate registration information.
+
+4. Household data
+You may create or join a family household. Owners and co-owners manage membership and settings. You are responsible for information you add about yourself or other household members, including health-related notes you choose to store.
+
+5. Acceptable use
+Do not misuse the service, attempt unauthorized access, upload malicious content, or use MyPlanr for unlawful purposes.
+
+6. Subscriptions and payments
+If paid features are introduced, additional terms will apply at the time of purchase.
+
+7. Disclaimer
+MyPlanr is provided "as is" without warranties. It is not a medical device and does not provide medical advice. Medicine reminders are convenience features only.
+
+8. Limitation of liability
+To the extent permitted by law, ALNLabs is not liable for indirect or consequential damages arising from use of the app.
+
+9. Termination
+You may delete your account at any time from Settings. We may suspend accounts that violate these terms.
+
+10. Contact
+Questions: support@alnlabs.com

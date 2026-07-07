@@ -51,5 +51,16 @@
 		<string>MyPlanr needs photo library access to attach warranty cards and receipts to home assets.</string>
 		<key>NSCameraUsageDescription</key>
 		<string>MyPlanr needs camera access to photograph warranty cards and receipts.</string>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.alnlabs.myplanr</string>
+				</array>
+			</dict>
+		</array>
 	</dict>
 </plist>

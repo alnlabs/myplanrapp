@@ -24,6 +24,9 @@ dependencies:
   timezone: ^0.10.1
   image_picker: ^1.1.2
   url_launcher: ^6.3.1
+  permission_handler: ^11.3.1
+  in_app_review: ^2.0.12
+  in_app_update: ^4.2.5
 
 dev_dependencies:
   flutter_test:
@@ -56,3 +59,14 @@ flutter:
   assets:
     - .env
     - assets/branding/
+    - assets/legal/
+  fonts:
+    - family: DMSans
+      fonts:
+        - asset: assets/fonts/DMSans-Regular.ttf
+        - asset: assets/fonts/DMSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/DMSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/DMSans-Bold.ttf
+          weight: 700

@@ -13,6 +13,7 @@ import '../../../shared/utils/formatters.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
+import '../../../shared/widgets/reminder_field.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/subscription_repository.dart';
 
@@ -37,6 +38,7 @@ class _SubscriptionFormScreenState extends ConsumerState<SubscriptionFormScreen>
   int _dueMonth = DateTime.now().month;
   bool _autoRenew = true;
   bool _reminderEnabled = false;
+  DateTime? _reminderAt;
   int _reminderDaysBefore = 3;
   bool _loading = false;
   bool _loaded = false;
@@ -63,9 +65,26 @@ class _SubscriptionFormScreenState extends ConsumerState<SubscriptionFormScreen>
     _dueMonth = sub.dueMonth ?? DateTime.now().month;
     _autoRenew = sub.autoRenew;
     _reminderEnabled = sub.reminderEnabled;
+    _reminderAt = sub.reminderAt ?? sub.effectiveReminderAt;
     _reminderDaysBefore = sub.reminderDaysBefore;
     _householdId = sub.householdId;
     _loaded = true;
+  }
+
+  int _reminderDaysBeforeForSave() {
+    if (!_reminderEnabled || _reminderAt == null) return _reminderDaysBefore;
+    final due = Subscription.computeNextDueDate(
+      billingCycle: _billingCycle,
+      dueDay: _dueDay,
+      dueMonth: _billingCycle == BillingCycles.yearly ? _dueMonth : null,
+      from: DateTime.now(),
+    );
+    return DateTime(due.year, due.month, due.day)
+        .difference(
+          DateTime(_reminderAt!.year, _reminderAt!.month, _reminderAt!.day),
+        )
+        .inDays
+        .clamp(0, 30);
   }
 
   Subscription _build({Subscription? existing}) {
@@ -80,7 +99,8 @@ class _SubscriptionFormScreenState extends ConsumerState<SubscriptionFormScreen>
       dueMonth: _billingCycle == BillingCycles.yearly ? _dueMonth : null,
       autoRenew: _autoRenew,
       reminderEnabled: _reminderEnabled,
-      reminderDaysBefore: _reminderDaysBefore,
+      reminderDaysBefore: _reminderDaysBeforeForSave(),
+      reminderAt: _reminderEnabled ? _reminderAt : null,
       notes: _emptyToNull(_notes.text),
       isActive: existing?.isActive ?? true,
     );
@@ -90,6 +110,10 @@ class _SubscriptionFormScreenState extends ConsumerState<SubscriptionFormScreen>
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_reminderEnabled && _reminderAt == null) {
+      setState(() => _error = 'Pick a reminder date and time');
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -251,29 +275,13 @@ class _SubscriptionFormScreenState extends ConsumerState<SubscriptionFormScreen>
                   value: _autoRenew,
                   onChanged: (v) => setState(() => _autoRenew = v),
                 ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text(AppStrings.reminder),
-                  subtitle: const Text(AppStrings.subscriptionReminderHint),
-                  value: _reminderEnabled,
-                  onChanged: (v) => setState(() => _reminderEnabled = v),
+                ReminderField(
+                  enabled: _reminderEnabled,
+                  reminderAt: _reminderAt,
+                  subtitle: AppStrings.subscriptionReminderHint,
+                  onEnabledChanged: (value) => setState(() => _reminderEnabled = value),
+                  onReminderAtChanged: (value) => setState(() => _reminderAt = value),
                 ),
-                if (_reminderEnabled) ...[
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<int>(
-                    value: _reminderDaysBefore,
-                    decoration: const InputDecoration(
-                      labelText: AppStrings.remindBefore,
-                    ),
-                    items: ReminderDaysBefore.options
-                        .map((d) => DropdownMenuItem(
-                              value: d,
-                              child: Text(AppStrings.daysBefore(d)),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setState(() => _reminderDaysBefore = v!),
-                  ),
-                ],
                 const SizedBox(height: 16),
                 AppTextField(
                   controller: _notes,

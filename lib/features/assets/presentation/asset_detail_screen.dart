@@ -27,7 +27,11 @@ class AssetDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.assetsTitle),
+        title: assetAsync.when(
+          data: (asset) => Text(asset?.name ?? AppStrings.assetsTitle),
+          loading: () => const Text(AppStrings.assetsTitle),
+          error: (_, __) => const Text(AppStrings.assetsTitle),
+        ),
         actions: [
           assetAsync.whenOrNull(
             data: (asset) {
@@ -40,11 +44,15 @@ class AssetDetailScreen extends ConsumerWidget {
               if (!canEdit) return null;
               return IconButton(
                 icon: const Icon(Icons.edit_outlined),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => AssetFormScreen(assetId: asset.id),
-                  ),
-                ),
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AssetFormScreen(assetId: asset.id),
+                    ),
+                  );
+                  ref.invalidate(homeAssetProvider(assetId));
+                  ref.invalidate(homeAssetsProvider);
+                },
               );
             },
           ) ??
@@ -77,7 +85,7 @@ class AssetDetailScreen extends ConsumerWidget {
           }
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             children: [
               Text(
                 asset.name,

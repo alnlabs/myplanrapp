@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/strings/app_strings.dart';
+import '../../../shared/models/account_deletion_status.dart';
 import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
 import '../../../shared/widgets/myplanr_logo.dart';
+import '../../../shared/widgets/secret_tap.dart';
 import '../data/auth_repository.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -43,12 +45,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             _password.text,
           );
       ref.invalidate(userProfileProvider);
-      final profile = await ref.read(authRepositoryProvider).fetchProfile();
-      if (!mounted) return;
-      if (profile?.hasHousehold ?? false) {
-        context.go('/home');
-      } else {
-        context.go('/household-setup');
+      try {
+        final profile =
+            await ref.read(authRepositoryProvider).fetchProfileAfterAuth();
+        if (!mounted) return;
+        if (profile?.isPendingDeletion ?? false) {
+          context.go('/account-restore');
+          return;
+        }
+        if (profile?.hasHousehold ?? false) {
+          context.go('/home');
+        } else {
+          context.go('/household-setup');
+        }
+      } on AccountDeletionExpiredException {
+        if (!mounted) return;
+        setState(() => _error = AppStrings.accountDeletionExpired);
       }
     } catch (e) {
       setState(() => _error = ApiErrorFormatter.format(e));
@@ -69,20 +81,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Center(child: MyPlanrLogo(height: 80)),
+                const Center(
+                  child: SecretTap(child: MyPlanrLogo(height: 80)),
+                ),
                 const SizedBox(height: 32),
                 AppTextField(
                   controller: _email,
-                  label: AppStrings.email,
-                  validator: Validators.email,
-                  keyboardType: TextInputType.emailAddress,
+                  label: AppStrings.emailOrUsername,
+                  validator: Validators.required,
                 ),
                 const SizedBox(height: 16),
-                AppTextField(
+                AppPasswordField(
                   controller: _password,
                   label: AppStrings.password,
                   validator: Validators.password,
-                  obscureText: true,
+                  textInputAction: TextInputAction.done,
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),

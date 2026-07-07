@@ -45,7 +45,7 @@ class HouseholdRepository {
   Future<List<HouseholdMember>> fetchMembers(String householdId) async {
     final data = await _client
         .from('household_memberships')
-        .select('id, user_id, role, profiles(display_name)')
+        .select('id, user_id, role, profiles(display_name, username)')
         .eq('household_id', householdId)
         .order('joined_at');
     return (data as List)
@@ -74,6 +74,12 @@ class HouseholdRepository {
     return (data as List).cast<Map<String, dynamic>>();
   }
 
+  Future<void> cancelInvite(String inviteId) async {
+    await _client.rpc('cancel_household_invite', params: {
+      'p_invite_id': inviteId,
+    });
+  }
+
   Future<void> leaveHousehold(String householdId) async {
     await _client.rpc('leave_household', params: {
       'p_household_id': householdId,
@@ -85,6 +91,25 @@ class HouseholdRepository {
       'p_household_id': householdId,
       'p_user_id': userId,
     });
+  }
+
+  Future<void> setMemberRole(
+    String householdId,
+    String userId,
+    String role,
+  ) async {
+    await _client.rpc('set_member_role', params: {
+      'p_household_id': householdId,
+      'p_user_id': userId,
+      'p_role': role,
+    });
+  }
+
+  Future<void> renameHousehold(String householdId, String name) async {
+    await _client
+        .from('households')
+        .update({'name': name.trim()})
+        .eq('id', householdId);
   }
 
   Future<List<Map<String, dynamic>>> fetchPendingInvitesForUser() async {

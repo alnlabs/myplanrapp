@@ -3,6 +3,7 @@ class StorageBuckets {
   StorageBuckets._();
 
   static const householdAttachments = 'household-attachments';
+  static const householdAvatars = 'household-avatars';
 }
 
 class AttachmentTypes {

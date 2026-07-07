@@ -172,7 +172,7 @@ class _AssetFormScreenState extends ConsumerState<AssetFormScreen> {
                 validator: Validators.required,
               ),
               const SizedBox(height: 16),
-              AppTextField(controller: _description, label: AppStrings.planDescription, maxLines: 2),
+              AppTextField(controller: _description, label: AppStrings.descriptionOptional, maxLines: 2),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _category,

@@ -1,0 +1,10 @@
+# Copy to android/key.properties and fill in for signed release builds.
+# Generate a keystore:
+#   keytool -genkey -v -keystore ~/myplanr-release.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias myplanr
+#
+# storeFile can be an absolute path or relative to android/app.
+storePassword=changeme
+keyPassword=changeme
+keyAlias=myplanr
+storeFile=/absolute/path/to/myplanr-release.jks

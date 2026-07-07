@@ -76,44 +76,124 @@ class _HouseholdFeaturesScreenState extends ConsumerState<HouseholdFeaturesScree
     final modules = ref.watch(enabledModulesProvider);
     _loadFromModules(modules);
 
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(title: const Text(AppStrings.featureSettings)),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
-          Text(AppStrings.interestsQuestion),
+          Text(
+            AppStrings.interestsQuestion,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            AppStrings.featureSettingsHint,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: HouseholdInterests.all.map((interest) {
-              final selected = _selectedInterests.contains(interest.id);
-              return FilterChip(
-                label: Text('${interest.icon} ${interest.label}'),
+          ...HouseholdInterests.all.map((interest) {
+            final selected = _selectedInterests.contains(interest.id);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _InterestCard(
+                icon: interest.icon,
+                label: interest.label,
                 selected: selected,
-                onSelected: (value) {
+                onTap: () {
                   setState(() {
-                    if (value) {
+                    if (selected) {
+                      if (_selectedInterests.length > 1) {
+                        _selectedInterests.remove(interest.id);
+                      }
+                    } else {
                       _selectedInterests.add(interest.id);
-                    } else if (_selectedInterests.length > 1) {
-                      _selectedInterests.remove(interest.id);
                     }
                   });
                 },
-              );
-            }).toList(),
-          ),
+              ),
+            );
+          }),
           if (_error != null) ...[
             const SizedBox(height: 12),
-            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           LoadingButton(
             label: AppStrings.save,
             isLoading: _saving,
             onPressed: _save,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _InterestCard extends StatelessWidget {
+  const _InterestCard({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final borderColor =
+        selected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant;
+
+    return Material(
+      color: selected
+          ? theme.colorScheme.primaryContainer.withOpacity(0.35)
+          : theme.colorScheme.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: borderColor,
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Text(icon, style: const TextStyle(fontSize: 24)),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(
+                selected
+                    ? Icons.check_circle
+                    : Icons.radio_button_unchecked,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

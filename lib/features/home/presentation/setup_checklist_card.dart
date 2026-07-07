@@ -104,7 +104,7 @@ class _CheckItem extends StatelessWidget {
             : Theme.of(context).colorScheme.outline,
       ),
       title: Text(label),
-      subtitle: optional ? Text(AppStrings.optional) : null,
+      subtitle: optional ? const Text(AppStrings.optional) : null,
       trailing: done ? null : const Icon(Icons.chevron_right, size: 20),
       onTap: done ? null : onTap,
     );

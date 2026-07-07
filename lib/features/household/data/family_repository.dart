@@ -13,7 +13,10 @@ class FamilyRepository {
   Future<List<FamilyMember>> fetchRoster(String householdId) async {
     final data = await _client
         .from('household_family_members')
-        .select()
+        .select(
+          '*, household_member_details(avatar_url), '
+          'profiles!household_family_members_user_id_fkey(display_name, username)',
+        )
         .eq('household_id', householdId)
         .order('created_at');
     return (data as List)
@@ -31,14 +34,30 @@ class FamilyRepository {
     return FamilyMember.fromJson(data);
   }
 
-  Future<FamilyMemberDetails?> fetchDetails(String familyMemberId) async {
+  Future<FamilyMember?> fetchMemberForUser({
+    required String householdId,
+    required String userId,
+  }) async {
     final data = await _client
-        .from('household_member_details')
-        .select()
-        .eq('family_member_id', familyMemberId)
+        .from('household_family_members')
+        .select(
+          '*, household_member_details(avatar_url), '
+          'profiles!household_family_members_user_id_fkey(display_name, username)',
+        )
+        .eq('household_id', householdId)
+        .eq('user_id', userId)
         .maybeSingle();
     if (data == null) return null;
-    return FamilyMemberDetails.fromJson(data);
+    return FamilyMember.fromJson(data);
+  }
+
+  Future<FamilyMemberDetails?> fetchDetails(String familyMemberId) async {
+    final data = await _client.rpc(
+      'get_member_details_for_viewer',
+      params: {'p_family_member_id': familyMemberId},
+    );
+    if (data == null) return null;
+    return FamilyMemberDetails.fromJson(data as Map<String, dynamic>);
   }
 
   Future<String> addRosterMember({
@@ -77,6 +96,22 @@ class FamilyRepository {
     });
   }
 
+  Future<void> convertToAppMember({
+    required String familyMemberId,
+    required String email,
+  }) async {
+    await _client.rpc('convert_roster_to_app', params: {
+      'p_family_member_id': familyMemberId,
+      'p_email': email.trim().toLowerCase(),
+    });
+  }
+
+  Future<void> convertToProfileOnly(String familyMemberId) async {
+    await _client.rpc('convert_app_to_roster', params: {
+      'p_family_member_id': familyMemberId,
+    });
+  }
+
   Future<void> upsertDetails(
     String familyMemberId,
     FamilyMemberDetails details,
@@ -107,4 +142,15 @@ final familyMemberProvider =
 final familyMemberDetailsProvider =
     FutureProvider.family<FamilyMemberDetails?, String>((ref, id) async {
   return ref.watch(familyRepositoryProvider).fetchDetails(id);
+});
+
+final currentUserFamilyMemberProvider = FutureProvider<FamilyMember?>((ref) async {
+  final profile = await ref.watch(userProfileProvider.future);
+  final userId = ref.watch(currentUserIdProvider);
+  final householdId = profile?.activeHouseholdId;
+  if (householdId == null || userId == null) return null;
+  return ref.watch(familyRepositoryProvider).fetchMemberForUser(
+        householdId: householdId,
+        userId: userId,
+      );
 });

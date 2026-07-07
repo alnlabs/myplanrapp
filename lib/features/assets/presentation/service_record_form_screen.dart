@@ -33,7 +33,7 @@ class _ServiceRecordFormScreenState extends ConsumerState<ServiceRecordFormScree
   final _bookingRef = TextEditingController();
   final _cost = TextEditingController();
   final _notes = TextEditingController();
-  DateTime _serviceDate = DateTime.now();
+  final DateTime _serviceDate = DateTime.now();
   bool _loading = false;
   String? _error;
 

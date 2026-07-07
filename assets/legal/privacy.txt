@@ -1,0 +1,37 @@
+MyPlanr — Privacy Policy
+Last updated: July 2026
+
+1. Overview
+MyPlanr ("we", "ALNLabs") respects your privacy. This policy explains what we collect and how we use it.
+
+2. Information we collect
+- Account: email, display name, authentication data
+- Household: family roster, inventory, expenses, recipes, plans, shopping lists, subscriptions, and optional profile details you enter (including health notes if you choose to add them)
+- Device: push notification tokens and local app preferences (theme, notification settings)
+- Diagnostics: optional in-app logs you can view on your device
+
+3. How we use information
+We use your data to operate the app, sync household content, send reminders you enable, and improve reliability and security.
+
+4. Storage and security
+Data is stored with Supabase (hosted infrastructure). Photos and attachments are stored in private buckets accessible only to your household via signed URLs. We use industry-standard authentication and row-level security.
+
+5. Sharing
+We do not sell your personal information. Household data is visible to members of your household according to app permissions and visibility settings you configure.
+
+6. Your choices
+- Edit or delete profile information in the app
+- Control notification permissions on your device
+- Delete your account from Settings (permanent)
+
+7. Data retention
+When you delete your account, we remove your authentication record. Household content you created may remain for other members until they delete it.
+
+8. Children
+MyPlanr is intended for household use by adults. Parents or guardians manage profiles for children in the family roster.
+
+9. Changes
+We may update this policy. Continued use after changes constitutes acceptance.
+
+10. Contact
+Privacy questions: privacy@alnlabs.com

@@ -21,20 +21,16 @@ class RecipesScreen extends ConsumerWidget {
     final recipesAsync = ref.watch(recipesProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.recipesTitle),
-        actions: [
-          IconButton(
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const RecipeFormScreen()),
-              );
-              ref.invalidate(recipesProvider);
-            },
-            icon: const Icon(Icons.add),
-            tooltip: AppStrings.addRecipe,
-          ),
-        ],
+      appBar: AppBar(title: const Text(AppStrings.recipesTitle)),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const RecipeFormScreen()),
+          );
+          ref.invalidate(recipesProvider);
+        },
+        icon: const Icon(Icons.add),
+        label: const Text(AppStrings.addRecipe),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -45,6 +41,7 @@ class RecipesScreen extends ConsumerWidget {
           value: recipesAsync,
           onRetry: () => ref.invalidate(recipesProvider),
           isEmpty: (recipes) => recipes.isEmpty,
+          emptyIcon: Icons.menu_book_outlined,
           emptyTitle: AppStrings.emptyRecipes,
           emptySubtitle: AppStrings.emptyRecipesHint,
           emptyActionLabel: AppStrings.addRecipe,
@@ -52,14 +49,23 @@ class RecipesScreen extends ConsumerWidget {
             MaterialPageRoute<void>(builder: (_) => const RecipeFormScreen()),
           ),
           builder: (recipes) {
+            final theme = Theme.of(context);
             return ListView.separated(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               itemCount: recipes.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final recipe = recipes[index];
                 return Card(
+                  margin: EdgeInsets.zero,
                   child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: theme.colorScheme.secondaryContainer,
+                      child: Icon(
+                        Icons.restaurant_menu_outlined,
+                        color: theme.colorScheme.onSecondaryContainer,
+                      ),
+                    ),
                     title: Text(recipe.name),
                     subtitle: Text(
                       '${recipe.servings} ${AppStrings.servings.toLowerCase()}',
@@ -121,7 +127,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
     if (!canCook) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Not all ingredients are available')),
+        const SnackBar(content: Text(AppStrings.recipeNotEnoughIngredients)),
       );
       return;
     }
@@ -132,7 +138,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
       builder: (context) => AlertDialog(
         title: const Text(AppStrings.cookAndDeduct),
         content: Text(
-          'Update pantry for $_targetServings ${AppStrings.servings.toLowerCase()}?',
+          AppStrings.recipeUpdatePantryConfirm('$_targetServings'),
         ),
         actions: [
           TextButton(
@@ -159,7 +165,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
       ref.invalidate(recipeAvailabilityProvider(widget.recipe.id));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pantry updated after cooking')),
+          const SnackBar(content: Text(AppStrings.recipePantryUpdated)),
         );
       }
     } catch (e) {
@@ -256,7 +262,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Text('${AppStrings.cookingFor}:'),
+                      const Text('${AppStrings.cookingFor}:'),
                       const SizedBox(width: 12),
                       IconButton(
                         onPressed: _targetServings > 1
@@ -274,7 +280,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                       ),
                       const Spacer(),
                       Text(
-                        'Recipe: ${widget.recipe.servings}',
+                        AppStrings.recipeServingsLabel(widget.recipe.servings),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -327,8 +333,11 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                       child: ListTile(
                         title: Text(row.ingredientName),
                         subtitle: Text(
-                          'Need ${Formatters.quantity(needed, row.unit)} · '
-                          'Have ${Formatters.quantity(row.availableQuantity, row.unit)}',
+                          AppStrings.recipeNeedHave(
+                            Formatters.quantity(needed, row.unit),
+                            Formatters.quantity(
+                                row.availableQuantity, row.unit),
+                          ),
                         ),
                         trailing: StatusChip(type: chipType),
                       ),
@@ -345,7 +354,8 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Added missing items to shop list'),
+                              content:
+                                  Text(AppStrings.recipeAddedMissingToShop),
                             ),
                           );
                         }

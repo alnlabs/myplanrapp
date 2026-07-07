@@ -24,4 +24,17 @@ class Formatters {
         : quantity.toString();
     return '$qtyText ${PantryUnits.label(unit)}';
   }
+
+  static String pantryItemSubtitle({
+    required double quantity,
+    required String unit,
+    String? brand,
+  }) {
+    final qty = Formatters.quantity(quantity, unit);
+    final brandLabel = brand?.trim();
+    if (brandLabel != null && brandLabel.isNotEmpty) {
+      return '$brandLabel · $qty';
+    }
+    return qty;
+  }
 }

@@ -24,7 +24,11 @@ class PlanDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.plansTitle),
+        title: planAsync.when(
+          data: (plan) => Text(plan?.title ?? AppStrings.plansTitle),
+          loading: () => const Text(AppStrings.plansTitle),
+          error: (_, __) => const Text(AppStrings.plansTitle),
+        ),
         actions: [
           planAsync.whenOrNull(
             data: (plan) {
@@ -33,11 +37,16 @@ class PlanDetailScreen extends ConsumerWidget {
               }
               return IconButton(
                 icon: const Icon(Icons.edit_outlined),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => PlanFormScreen(planId: plan.id),
-                  ),
-                ),
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => PlanFormScreen(planId: plan.id),
+                    ),
+                  );
+                  ref.invalidate(planProvider(planId));
+                  ref.invalidate(plansProvider);
+                  ref.invalidate(openPlansProvider);
+                },
               );
             },
           ) ??

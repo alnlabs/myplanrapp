@@ -14,6 +14,7 @@ class Subscription {
     this.autoRenew = true,
     this.reminderEnabled = false,
     this.reminderDaysBefore = 3,
+    this.reminderAt,
     this.lastPaidExpenseId,
     this.isActive = true,
     this.notes,
@@ -31,6 +32,7 @@ class Subscription {
   final bool autoRenew;
   final bool reminderEnabled;
   final int reminderDaysBefore;
+  final DateTime? reminderAt;
   final String? lastPaidExpenseId;
   final bool isActive;
   final String? notes;
@@ -42,10 +44,36 @@ class Subscription {
         from: DateTime.now(),
       );
 
-  DateTime? get reminderAt {
+  DateTime? get effectiveReminderAt {
     if (!reminderEnabled) return null;
-    final due = nextDueDate;
-    return due.subtract(Duration(days: reminderDaysBefore));
+    if (reminderAt != null) return _resolveReminderAt(reminderAt!);
+    return nextDueDate.subtract(Duration(days: reminderDaysBefore));
+  }
+
+  DateTime _resolveReminderAt(DateTime stored) {
+    var at = stored.toLocal();
+    var due = nextDueDate;
+    while (!at.isAfter(DateTime.now())) {
+      final daysBefore = DateTime(due.year, due.month, due.day)
+          .difference(DateTime(at.year, at.month, at.day))
+          .inDays
+          .clamp(0, 30);
+      due = computeNextDueDate(
+        billingCycle: billingCycle,
+        dueDay: dueDay,
+        dueMonth: dueMonth,
+        from: due.add(const Duration(days: 1)),
+      );
+      final dueDayDate = DateTime(due.year, due.month, due.day);
+      at = DateTime(
+        dueDayDate.year,
+        dueDayDate.month,
+        dueDayDate.day,
+        stored.hour,
+        stored.minute,
+      ).subtract(Duration(days: daysBefore));
+    }
+    return at;
   }
 
   int get daysUntilDue {
@@ -71,6 +99,9 @@ class Subscription {
       autoRenew: json['auto_renew'] as bool? ?? true,
       reminderEnabled: json['reminder_enabled'] as bool? ?? false,
       reminderDaysBefore: json['reminder_days_before'] as int? ?? 3,
+      reminderAt: json['reminder_at'] != null
+          ? DateTime.parse(json['reminder_at'] as String)
+          : null,
       lastPaidExpenseId: json['last_paid_expense_id'] as String?,
       isActive: json['is_active'] as bool? ?? true,
       notes: json['notes'] as String?,
@@ -90,6 +121,7 @@ class Subscription {
       'auto_renew': autoRenew,
       'reminder_enabled': reminderEnabled,
       'reminder_days_before': reminderDaysBefore,
+      'reminder_at': reminderEnabled ? reminderAt?.toUtc().toIso8601String() : null,
       'is_active': isActive,
       'notes': notes,
     };

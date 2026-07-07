@@ -27,7 +27,7 @@ class ExpenseSummaryScreen extends ConsumerWidget {
             children: [
               Card(
                 child: ListTile(
-                  title: Text(AppStrings.monthlyTotal),
+                  title: const Text(AppStrings.monthlyTotal),
                   subtitle: Text(Formatters.monthYear(DateTime.now())),
                   trailing: Text(
                     Formatters.currency(total),

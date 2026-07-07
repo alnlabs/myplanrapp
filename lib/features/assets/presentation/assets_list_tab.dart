@@ -26,27 +26,31 @@ class AssetsListTab extends ConsumerWidget {
       emptySubtitle: AppStrings.emptyAssetsHint,
       builder: (assets) {
         final filtered = _filter(assets);
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
+        if (filtered.isEmpty) {
+          return ListView(
+            children: const [
+              SizedBox(height: 64),
+              Center(child: Text(AppStrings.emptyAssets)),
+            ],
+          );
+        }
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 180,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.35,
+          ),
           itemCount: filtered.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
             final asset = filtered[index];
-            return Card(
-              child: ListTile(
-                leading: Icon(_iconFor(asset.category)),
-                title: Text(asset.name),
-                subtitle: Text(
-                  [
-                    AssetCategories.labelFor(asset.category),
-                    if (asset.location != null) asset.location!,
-                  ].join(' · '),
-                ),
-                trailing: WarrantyChip(status: asset.warrantyStatus),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => AssetDetailScreen(assetId: asset.id),
-                  ),
+            return _AssetGridCard(
+              asset: asset,
+              icon: _iconFor(asset.category),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AssetDetailScreen(assetId: asset.id),
                 ),
               ),
             );
@@ -75,4 +79,79 @@ class AssetsListTab extends ConsumerWidget {
         AssetCategories.cable => Icons.cable_outlined,
         _ => Icons.inventory_2_outlined,
       };
+}
+
+class _AssetGridCard extends StatelessWidget {
+  const _AssetGridCard({
+    required this.asset,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final HomeAsset asset;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: theme.colorScheme.secondaryContainer,
+                    child: Icon(
+                      icon,
+                      color: theme.colorScheme.onSecondaryContainer,
+                      size: 18,
+                    ),
+                  ),
+                  WarrantyChip(status: asset.warrantyStatus),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    asset.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      AssetCategories.labelFor(asset.category),
+                      if (asset.location != null) asset.location!,
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

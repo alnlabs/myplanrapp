@@ -10,6 +10,7 @@ import '../../../shared/utils/formatters.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
+import '../../../shared/widgets/quantity_with_unit_field.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../pantry/data/pantry_repository.dart';
 import '../data/expense_repository.dart';
@@ -34,9 +35,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   String? _categoryId;
   bool _linkPantry = false;
   PantryItem? _pantryItem;
+  bool _creatingNewItem = false;
   final _restockQty = TextEditingController();
+  final _newItemName = TextEditingController();
+  String _newItemUnit = 'kg';
   bool _loading = false;
   String? _error;
+
+  static const _newItemValue = '__new__';
 
   @override
   void initState() {
@@ -57,6 +63,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     _amount.dispose();
     _note.dispose();
     _restockQty.dispose();
+    _newItemName.dispose();
     super.dispose();
   }
 
@@ -87,6 +94,31 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           note: _note.text.trim().isEmpty ? null : _note.text.trim(),
         );
       } else {
+        String? pantryItemId;
+        double? restockDelta;
+
+        if (_linkPantry) {
+          final qtyText = _restockQty.text.trim();
+          restockDelta = qtyText.isNotEmpty ? double.parse(qtyText) : null;
+
+          if (_creatingNewItem) {
+            final created =
+                await ref.read(pantryRepositoryProvider).createItem(
+                      PantryItem(
+                        id: '',
+                        householdId: householdId,
+                        name: _newItemName.text.trim(),
+                        quantity: 0,
+                        unit: _newItemUnit,
+                      ),
+                      householdId,
+                    );
+            pantryItemId = created.id;
+          } else {
+            pantryItemId = _pantryItem?.id;
+          }
+        }
+
         await repo.createExpense(
             householdId: householdId,
             categoryId: _categoryId!,
@@ -94,12 +126,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             title: _title.text.trim(),
             expenseDate: _date,
             note: _note.text.trim().isEmpty ? null : _note.text.trim(),
-            pantryItemId: _linkPantry ? _pantryItem?.id : null,
-            restockDelta: _linkPantry && _restockQty.text.trim().isNotEmpty
-                ? double.parse(_restockQty.text.trim())
-                : null,
+            pantryItemId: pantryItemId,
+            restockDelta: pantryItemId != null ? restockDelta : null,
             restockNote: _linkPantry ? 'Grocery purchase' : null,
           );
+        if (_linkPantry) {
+          ref.invalidate(pantryItemsProvider);
+          ref.invalidate(lowStockItemsProvider);
+        }
       }
 
       if (mounted) Navigator.pop(context, true);
@@ -136,6 +170,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 AppTextField(
                   controller: _amount,
                   label: AppStrings.amount,
+                  prefixText: '₹ ',
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   validator: Validators.positiveAmount,
                 ),
@@ -186,6 +221,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text(AppStrings.linkToPantry),
+                    subtitle: const Text(AppStrings.linkToPantryHint),
                     value: _linkPantry,
                     onChanged: (v) => setState(() => _linkPantry = v),
                   ),
@@ -194,22 +230,71 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       loading: () => const LinearProgressIndicator(),
                       error: (_, __) => const SizedBox.shrink(),
                       data: (items) {
+                        final selectedValue = _creatingNewItem
+                            ? _newItemValue
+                            : _pantryItem?.id;
                         return Column(
                           children: [
-                            DropdownButtonFormField<PantryItem>(
-                              value: _pantryItem,
-                              decoration: const InputDecoration(labelText: AppStrings.pantryTitle),
-                              items: items
-                                  .map((i) => DropdownMenuItem(value: i, child: Text(i.name)))
-                                  .toList(),
-                              onChanged: (v) => setState(() => _pantryItem = v),
+                            DropdownButtonFormField<String>(
+                              value: selectedValue,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: AppStrings.pantryChooseItem,
+                              ),
+                              items: [
+                                ...items.map(
+                                  (i) => DropdownMenuItem(
+                                    value: i.id,
+                                    child: Text(
+                                      '${i.name} · ${Formatters.quantity(i.quantity, i.unit)}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                const DropdownMenuItem(
+                                  value: _newItemValue,
+                                  child: Text(AppStrings.pantryCreateNew),
+                                ),
+                              ],
+                              onChanged: (v) => setState(() {
+                                if (v == _newItemValue) {
+                                  _creatingNewItem = true;
+                                  _pantryItem = null;
+                                } else {
+                                  _creatingNewItem = false;
+                                  _pantryItem = items
+                                      .where((i) => i.id == v)
+                                      .cast<PantryItem?>()
+                                      .firstOrNull;
+                                }
+                              }),
                             ),
-                            const SizedBox(height: 12),
-                            AppTextField(
-                              controller: _restockQty,
-                              label: AppStrings.restockItem,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            ),
+                            if (_creatingNewItem) ...[
+                              const SizedBox(height: 12),
+                              AppTextField(
+                                controller: _newItemName,
+                                label: AppStrings.newItemName,
+                                validator: Validators.required,
+                              ),
+                              const SizedBox(height: 12),
+                              QuantityWithUnitField(
+                                controller: _restockQty,
+                                label: AppStrings.quantity,
+                                unit: _newItemUnit,
+                                onUnitChanged: (v) =>
+                                    setState(() => _newItemUnit = v),
+                                validator: Validators.positiveNumber,
+                              ),
+                            ] else if (_pantryItem != null) ...[
+                              const SizedBox(height: 12),
+                              QuantityWithUnitField(
+                                controller: _restockQty,
+                                label: AppStrings.restockItem,
+                                unit: _pantryItem!.unit,
+                                readOnlyUnit: true,
+                                validator: Validators.positiveNumber,
+                              ),
+                            ],
                           ],
                         );
                       },

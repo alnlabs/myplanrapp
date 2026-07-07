@@ -10,6 +10,7 @@ class HouseholdModules {
   static const assets = 'assets';
   static const memberDetails = 'member_details';
   static const subscriptions = 'subscriptions';
+  static const reminders = 'reminders';
 
   static const defaultEnabled = [
     pantry,
@@ -19,6 +20,7 @@ class HouseholdModules {
     recipes,
     assets,
     memberDetails,
+    reminders,
   ];
 }
 
@@ -58,9 +60,9 @@ class HouseholdInterests {
     groceries: [HouseholdModules.pantry, HouseholdModules.shopping],
     recipes: [HouseholdModules.recipes, HouseholdModules.pantry],
     expenses: [HouseholdModules.expenses],
-    plans: [HouseholdModules.plans],
+    plans: [HouseholdModules.plans, HouseholdModules.reminders],
     assets: [HouseholdModules.assets],
-    familyHealth: [HouseholdModules.memberDetails],
-    bills: [HouseholdModules.subscriptions, HouseholdModules.expenses],
+    familyHealth: [HouseholdModules.memberDetails, HouseholdModules.reminders],
+    bills: [HouseholdModules.subscriptions, HouseholdModules.expenses, HouseholdModules.reminders],
   };
 }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/widgets/myplanr_logo.dart';
+import '../../../shared/widgets/secret_tap.dart';
 import '../../onboarding/providers/onboarding_provider.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -93,7 +94,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         if (slide.useLogo)
-                          const MyPlanrLogo(height: 96, showWordmark: true)
+                          const SecretTap(
+                            child: MyPlanrLogo(height: 96, showWordmark: true),
+                          )
                         else
                           Container(
                             width: 88,

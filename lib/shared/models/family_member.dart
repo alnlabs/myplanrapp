@@ -1,4 +1,5 @@
 import '../constants/family_relationships.dart';
+import '../utils/member_display_name.dart';
 
 class FamilyMember {
   const FamilyMember({
@@ -13,6 +14,9 @@ class FamilyMember {
     this.phone,
     this.dateOfBirth,
     this.createdBy,
+    this.avatarUrl,
+    this.profileDisplayName,
+    this.profileUsername,
   });
 
   final String id;
@@ -26,6 +30,9 @@ class FamilyMember {
   final String? phone;
   final DateTime? dateOfBirth;
   final String? createdBy;
+  final String? avatarUrl;
+  final String? profileDisplayName;
+  final String? profileUsername;
 
   bool get isAppMember => memberType == 'app';
   bool get isRosterOnly => memberType == 'roster';
@@ -33,7 +40,23 @@ class FamilyMember {
 
   String get relationshipLabel => FamilyRelationships.labelFor(relationship);
 
+  /// Name shown in family lists: full name first, then username, then email.
+  String get listLabel => memberListLabel(
+        profileDisplayName: profileDisplayName,
+        rosterDisplayName: displayName,
+        username: profileUsername,
+        email: invitedEmail,
+      );
+
   factory FamilyMember.fromJson(Map<String, dynamic> json) {
+    final profile = json['profiles'];
+    String? profileDisplayName;
+    String? profileUsername;
+    if (profile is Map<String, dynamic>) {
+      profileDisplayName = profile['display_name'] as String?;
+      profileUsername = profile['username'] as String?;
+    }
+
     return FamilyMember(
       id: json['id'] as String,
       householdId: json['household_id'] as String,
@@ -48,8 +71,43 @@ class FamilyMember {
           ? DateTime.parse(json['date_of_birth'] as String)
           : null,
       createdBy: json['created_by'] as String?,
+      avatarUrl: _parseAvatarUrl(json),
+      profileDisplayName: profileDisplayName,
+      profileUsername: profileUsername,
     );
   }
+
+  static String? _parseAvatarUrl(Map<String, dynamic> json) {
+    final nested = json['household_member_details'];
+    if (nested is Map<String, dynamic>) {
+      return nested['avatar_url'] as String?;
+    }
+    if (nested is List && nested.isNotEmpty) {
+      final first = nested.first;
+      if (first is Map<String, dynamic>) {
+        return first['avatar_url'] as String?;
+      }
+    }
+    return json['avatar_url'] as String?;
+  }
+}
+
+class MemberVisibilityKeys {
+  MemberVisibilityKeys._();
+
+  static const phone = 'phone';
+  static const health = 'health';
+  static const emergency = 'emergency';
+
+  static const all = [phone, health, emergency];
+}
+
+class ClothingSizeKeys {
+  ClothingSizeKeys._();
+
+  static const shirt = 'shirt';
+  static const pants = 'pants';
+  static const shoes = 'shoes';
 }
 
 class FamilyMemberDetails {
@@ -73,6 +131,9 @@ class FamilyMemberDetails {
     this.emergencyContactPhone,
     this.emergencyContactRelation,
     this.notes,
+    this.avatarUrl,
+    this.clothingSizes = const {},
+    this.visibility = const {},
   });
 
   final String familyMemberId;
@@ -94,6 +155,11 @@ class FamilyMemberDetails {
   final String? emergencyContactPhone;
   final String? emergencyContactRelation;
   final String? notes;
+  final String? avatarUrl;
+  final Map<String, String> clothingSizes;
+  final Map<String, bool> visibility;
+
+  bool isVisible(String key) => visibility[key] ?? true;
 
   factory FamilyMemberDetails.fromJson(Map<String, dynamic> json) {
     return FamilyMemberDetails(
@@ -118,7 +184,20 @@ class FamilyMemberDetails {
       emergencyContactPhone: json['emergency_contact_phone'] as String?,
       emergencyContactRelation: json['emergency_contact_relation'] as String?,
       notes: json['notes'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
+      clothingSizes: _parseStringMap(json['clothing_sizes']),
+      visibility: _parseBoolMap(json['visibility']),
     );
+  }
+
+  static Map<String, String> _parseStringMap(dynamic value) {
+    if (value is! Map) return {};
+    return value.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+  }
+
+  static Map<String, bool> _parseBoolMap(dynamic value) {
+    if (value is! Map) return {};
+    return value.map((k, v) => MapEntry(k.toString(), v == true));
   }
 
   Map<String, dynamic> toJson() {
@@ -139,6 +218,9 @@ class FamilyMemberDetails {
       'emergency_contact_phone': emergencyContactPhone,
       'emergency_contact_relation': emergencyContactRelation,
       'notes': notes,
+      'avatar_url': avatarUrl,
+      'clothing_sizes': clothingSizes,
+      'visibility': visibility,
     };
   }
 
@@ -159,6 +241,9 @@ class FamilyMemberDetails {
     String? emergencyContactPhone,
     String? emergencyContactRelation,
     String? notes,
+    String? avatarUrl,
+    Map<String, String>? clothingSizes,
+    Map<String, bool>? visibility,
   }) {
     return FamilyMemberDetails(
       familyMemberId: familyMemberId,
@@ -181,6 +266,9 @@ class FamilyMemberDetails {
       emergencyContactRelation:
           emergencyContactRelation ?? this.emergencyContactRelation,
       notes: notes ?? this.notes,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      clothingSizes: clothingSizes ?? this.clothingSizes,
+      visibility: visibility ?? this.visibility,
     );
   }
 }

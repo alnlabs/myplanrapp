@@ -20,11 +20,33 @@ class Validators {
     return null;
   }
 
+  static String? username(String? value) {
+    final requiredError = required(value);
+    if (requiredError != null) return requiredError;
+    final trimmed = value!.trim();
+    if (trimmed.length < 3) {
+      return 'Username must be at least 3 characters';
+    }
+    if (!RegExp(r'^[a-zA-Z0-9_.]+$').hasMatch(trimmed)) {
+      return 'Use only letters, numbers, dot, or underscore';
+    }
+    return null;
+  }
+
   static String? password(String? value) {
     final requiredError = required(value);
     if (requiredError != null) return requiredError;
     if (value!.length < 6) {
       return 'Password must be at least 6 characters';
+    }
+    return null;
+  }
+
+  static String? confirmPassword(String? value, String original) {
+    final requiredError = required(value);
+    if (requiredError != null) return requiredError;
+    if (value != original) {
+      return AppStrings.passwordsDoNotMatch;
     }
     return null;
   }

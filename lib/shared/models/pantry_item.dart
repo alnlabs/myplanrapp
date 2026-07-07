@@ -1,3 +1,5 @@
+import '../constants/pantry_constants.dart';
+
 class PantryItem {
   const PantryItem({
     required this.id,
@@ -6,6 +8,8 @@ class PantryItem {
     required this.quantity,
     required this.unit,
     this.lowStockThreshold,
+    this.lowStockUnit,
+    this.brand,
     this.category,
     this.expiryDate,
     this.updatedAt,
@@ -17,12 +21,25 @@ class PantryItem {
   final double quantity;
   final String unit;
   final double? lowStockThreshold;
+  final String? lowStockUnit;
+  final String? brand;
   final String? category;
   final DateTime? expiryDate;
   final DateTime? updatedAt;
 
-  bool get isLowStock =>
-      lowStockThreshold != null && quantity <= lowStockThreshold!;
+  /// Unit the threshold is expressed in (defaults to the item's unit).
+  String get effectiveLowStockUnit => lowStockUnit ?? unit;
+
+  String? get brandLabel =>
+      brand != null && brand!.trim().isNotEmpty ? brand!.trim() : null;
+
+  bool get isLowStock {
+    if (lowStockThreshold == null) return false;
+    final quantityBase = quantity * PantryUnits.baseFactor(unit);
+    final thresholdBase =
+        lowStockThreshold! * PantryUnits.baseFactor(effectiveLowStockUnit);
+    return quantityBase <= thresholdBase;
+  }
 
   bool get isOutOfStock => quantity <= 0;
 
@@ -45,6 +62,8 @@ class PantryItem {
       lowStockThreshold: json['low_stock_threshold'] != null
           ? (json['low_stock_threshold'] as num).toDouble()
           : null,
+      lowStockUnit: json['low_stock_unit'] as String?,
+      brand: json['brand'] as String?,
       category: json['category'] as String?,
       expiryDate: json['expiry_date'] != null
           ? DateTime.parse(json['expiry_date'] as String)
@@ -62,6 +81,8 @@ class PantryItem {
       'quantity': quantity,
       'unit': unit,
       'low_stock_threshold': lowStockThreshold,
+      'low_stock_unit': lowStockThreshold == null ? null : effectiveLowStockUnit,
+      'brand': brandLabel,
       'category': category,
       'expiry_date': expiryDate?.toIso8601String().split('T').first,
       'created_by': userId,
@@ -74,6 +95,8 @@ class PantryItem {
       'quantity': quantity,
       'unit': unit,
       'low_stock_threshold': lowStockThreshold,
+      'low_stock_unit': lowStockThreshold == null ? null : effectiveLowStockUnit,
+      'brand': brandLabel,
       'category': category,
       'expiry_date': expiryDate?.toIso8601String().split('T').first,
     };
