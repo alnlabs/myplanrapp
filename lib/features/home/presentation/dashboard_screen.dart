@@ -457,26 +457,44 @@ class _QuickActionsGrid extends StatelessWidget {
 
     if (actions.isEmpty) return const SizedBox.shrink();
 
+    final rows = <Widget>[];
+    for (var i = 0; i < actions.length; i += 2) {
+      final left = actions[i];
+      final right = i + 1 < actions.length ? actions[i + 1] : null;
+      rows.add(
+        Padding(
+          padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: _QuickActionTile(
+                  icon: left.icon,
+                  label: left.label,
+                  onTap: left.onTap,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: right == null
+                    ? const SizedBox.shrink()
+                    : _QuickActionTile(
+                        icon: right.icon,
+                        label: right.label,
+                        onTap: right.onTap,
+                      ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionTitle(title: AppStrings.quickActions),
-        const SizedBox(height: 4),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 3.6,
-          children: actions.map((action) {
-            return _QuickActionTile(
-              icon: action.icon,
-              label: action.label,
-              onTap: action.onTap,
-            );
-          }).toList(),
-        ),
+        const SizedBox(height: 8),
+        ...rows,
       ],
     );
   }

@@ -5,7 +5,6 @@ import '../../../core/strings/app_strings.dart';
 import '../../../shared/constants/asset_constants.dart';
 import '../../../shared/models/home_asset.dart';
 import '../../../shared/widgets/async_screen_body.dart';
-import '../../../shared/widgets/warranty_chip.dart';
 import '../data/asset_repository.dart';
 import 'asset_detail_screen.dart';
 
@@ -37,10 +36,10 @@ class AssetsListTab extends ConsumerWidget {
         return GridView.builder(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
           gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 180,
+            maxCrossAxisExtent: 118,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 1.35,
+            mainAxisExtent: 124,
           ),
           itemCount: filtered.length,
           itemBuilder: (context, index) {
@@ -92,6 +91,13 @@ class _AssetGridCard extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
+  Color _warrantyColor(WarrantyStatus status) => switch (status) {
+        WarrantyStatus.valid => Colors.green.shade700,
+        WarrantyStatus.expiring => Colors.amber.shade800,
+        WarrantyStatus.expired => Colors.red.shade700,
+        WarrantyStatus.none => Colors.grey,
+      };
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -102,51 +108,65 @@ class _AssetGridCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
                   CircleAvatar(
-                    radius: 18,
+                    radius: 22,
                     backgroundColor: theme.colorScheme.secondaryContainer,
                     child: Icon(
                       icon,
                       color: theme.colorScheme.onSecondaryContainer,
-                      size: 18,
+                      size: 22,
                     ),
                   ),
-                  WarrantyChip(status: asset.warrantyStatus),
+                  if (asset.warrantyStatus != WarrantyStatus.none)
+                    Positioned(
+                      right: -1,
+                      top: -1,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: _warrantyColor(asset.warrantyStatus),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: theme.colorScheme.surface,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    asset.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    [
-                      AssetCategories.labelFor(asset.category),
-                      if (asset.location != null) asset.location!,
-                    ].join(' · '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 8),
+              Text(
+                asset.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                [
+                  AssetCategories.labelFor(asset.category),
+                  if (asset.location != null) asset.location!,
+                ].join(' · '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),

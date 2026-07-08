@@ -7,7 +7,6 @@ import '../../../shared/constants/pantry_constants.dart';
 import '../../../shared/models/pantry_item.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/widgets/async_screen_body.dart';
-import '../../../shared/widgets/status_chip.dart';
 import '../../pantry/data/pantry_repository.dart';
 import '../../pantry/presentation/pantry_item_detail_screen.dart';
 
@@ -41,10 +40,10 @@ class PantryListTab extends ConsumerWidget {
         return GridView.builder(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
           gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 180,
+            maxCrossAxisExtent: 118,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 1.35,
+            mainAxisExtent: 124,
           ),
           itemCount: filtered.length,
           itemBuilder: (context, index) {
@@ -95,61 +94,74 @@ class _PantryGridCard extends StatelessWidget {
             ? Colors.orange.shade800
             : theme.colorScheme.primary;
 
+    final showStatusDot = item.isOutOfStock || item.isLowStock;
+
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
                   CircleAvatar(
-                    radius: 18,
+                    radius: 22,
                     backgroundColor: statusColor.withOpacity(0.14),
                     child: Icon(
                       PantryCategories.iconFor(item.category),
                       color: statusColor,
-                      size: 18,
+                      size: 22,
                     ),
                   ),
-                  if (item.isOutOfStock)
-                    const StatusChip(type: StatusChipType.outOfStock)
-                  else if (item.isLowStock)
-                    const StatusChip(type: StatusChipType.lowStock),
+                  if (showStatusDot)
+                    Positioned(
+                      right: -1,
+                      top: -1,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: theme.colorScheme.surface,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    Formatters.pantryItemSubtitle(
-                      quantity: item.quantity,
-                      unit: item.unit,
-                      brand: item.brandLabel,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 8),
+              Text(
+                item.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                Formatters.pantryItemSubtitle(
+                  quantity: item.quantity,
+                  unit: item.unit,
+                  brand: item.brandLabel,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
