@@ -16,7 +16,9 @@ import '../data/family_repository.dart';
 import '../data/household_repository.dart';
 import 'medicine_schedules_section.dart';
 import 'member_avatar_picker.dart';
+import 'member_income_section.dart';
 import 'member_role_actions.dart';
+import 'recurring_income_section.dart';
 import 'member_role_helpers.dart';
 
 class FamilyMemberDetailScreen extends ConsumerStatefulWidget {
@@ -683,6 +685,19 @@ class _FamilyMemberDetailScreenState extends ConsumerState<FamilyMemberDetailScr
           label: AppStrings.schoolName,
           readOnly: !canEdit,
         ),
+        if (!widget.profileMode) ...[
+          const SizedBox(height: 16),
+          MemberIncomeSection(
+            familyMemberId: member.id,
+            canEdit: canEdit,
+          ),
+          const SizedBox(height: 12),
+          RecurringIncomeSection(
+            familyMemberId: member.id,
+            householdId: member.householdId,
+            canEdit: canEdit,
+          ),
+        ],
         const SizedBox(height: 24),
         Text(
           AppStrings.clothingSizes,

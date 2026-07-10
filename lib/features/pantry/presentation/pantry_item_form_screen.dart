@@ -9,10 +9,14 @@ import '../../../shared/utils/offline_guard.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/widgets/app_text_field.dart';
-import '../../../shared/widgets/loading_button.dart';
+import '../../../shared/widgets/form_screen_body.dart';
+import '../../../shared/widgets/pantry_availability_chips.dart';
 import '../../../shared/widgets/quantity_with_unit_field.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/pantry_repository.dart';
+import '../data/pantry_items_list_provider.dart';
+import '../data/pantry_shop_refresh.dart';
+import '../utils/pantry_form_validators.dart';
 
 class PantryItemFormScreen extends ConsumerStatefulWidget {
   const PantryItemFormScreen({super.key, this.item});
@@ -33,6 +37,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
   late String _unit;
   late String _lowStockUnit;
   String? _category;
+  String? _availabilityStatus;
   DateTime? _expiryDate;
   bool _loading = false;
   String? _error;
@@ -45,7 +50,9 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
     _name = TextEditingController(text: widget.item?.name ?? '');
     _brand = TextEditingController(text: widget.item?.brand ?? '');
     _quantity = TextEditingController(
-      text: widget.item?.quantity.toString() ?? '',
+      text: widget.item != null && widget.item!.quantity > 0
+          ? widget.item!.quantity.toString()
+          : '',
     );
     _threshold = TextEditingController(
       text: widget.item?.lowStockThreshold?.toString() ?? '',
@@ -53,6 +60,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
     _unit = widget.item?.unit ?? 'kg';
     _lowStockUnit = widget.item?.lowStockUnit ?? _unit;
     _category = widget.item?.category;
+    _availabilityStatus = widget.item?.availabilityStatus;
     _expiryDate = widget.item?.expiryDate;
   }
 
@@ -65,8 +73,38 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
     super.dispose();
   }
 
+  String? _validateQuantity(String? value) {
+    return validatePantryQuantity(
+      value,
+      hasAvailabilityStatus: _availabilityStatus != null,
+    );
+  }
+
+  bool _affectsShop() {
+    final existing = widget.item;
+    if (existing == null) return true;
+    final quantityText = _quantity.text.trim();
+    final newQty = quantityText.isEmpty ? 0.0 : double.parse(quantityText);
+    final thresholdText = _threshold.text.trim();
+    final newThreshold =
+        thresholdText.isEmpty ? null : double.parse(thresholdText);
+    return _availabilityStatus != existing.availabilityStatus ||
+        newQty != existing.quantity ||
+        newThreshold != existing.lowStockThreshold ||
+        _lowStockUnit != existing.lowStockUnit;
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final quantityText = _quantity.text.trim();
+    final hasQuantity = quantityText.isNotEmpty;
+    final hasStatus = _availabilityStatus != null;
+    if (!hasQuantity && !hasStatus) {
+      setState(() => _error = AppStrings.pantryTrackingRequired);
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -82,12 +120,13 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
         householdId: householdId,
         name: _name.text.trim(),
         brand: _brand.text.trim().isEmpty ? null : _brand.text.trim(),
-        quantity: double.parse(_quantity.text.trim()),
+        quantity: hasQuantity ? double.parse(quantityText) : 0,
         unit: _unit,
         lowStockThreshold: _threshold.text.trim().isEmpty
             ? null
             : double.parse(_threshold.text.trim()),
         lowStockUnit: _lowStockUnit,
+        availabilityStatus: _availabilityStatus,
         category: _category,
         expiryDate: _expiryDate,
       );
@@ -98,9 +137,11 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
         await ref.read(pantryRepositoryProvider).createItem(item, householdId);
       }
 
-      ref.invalidate(pantryItemsProvider);
-      ref.invalidate(lowStockItemsProvider);
-      ref.invalidate(expiringItemsProvider);
+      if (_affectsShop()) {
+        await refreshPantryAndShop(ref);
+      } else {
+        await refreshPantryList(ref);
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       setState(() => _error = ApiErrorFormatter.format(e));
@@ -115,99 +156,106 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
       appBar: AppBar(
         title: Text(isEditing ? AppStrings.editItem : AppStrings.addItem),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AppTextField(
-                  controller: _name,
-                  label: AppStrings.itemName,
-                  validator: Validators.required,
-                ),
-                const SizedBox(height: 16),
-                AppTextField(
-                  controller: _brand,
-                  label: AppStrings.brandOptional,
-                ),
-                const SizedBox(height: 16),
-                QuantityWithUnitField(
-                  controller: _quantity,
-                  label: AppStrings.quantity,
-                  unit: _unit,
-                  onUnitChanged: (v) => setState(() {
-                    _unit = v;
-                    if (PantryUnits.family(_lowStockUnit) !=
-                        PantryUnits.family(v)) {
-                      _lowStockUnit = v;
-                    }
-                  }),
-                  validator: Validators.positiveNumber,
-                ),
-                const SizedBox(height: 16),
-                QuantityWithUnitField(
-                  controller: _threshold,
-                  label: AppStrings.lowStockAlert,
-                  unit: _lowStockUnit,
-                  unitOptions: PantryUnits.compatibleWith(_unit),
-                  onUnitChanged: (v) => setState(() => _lowStockUnit = v),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _category,
-                  decoration: const InputDecoration(labelText: AppStrings.category),
-                  items: PantryCategories.values
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                      .toList(),
-                  onChanged: (v) => setState(() => _category = v),
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text(AppStrings.expiryDate),
-                  subtitle: Text(
-                    _expiryDate == null
-                        ? 'Not set'
-                        : Formatters.date(_expiryDate!),
+      body: FormScreenBody(
+        formKey: _formKey,
+        children: [
+          AppTextField(
+            controller: _name,
+            label: AppStrings.itemName,
+            validator: Validators.required,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          AppTextField(
+            controller: _brand,
+            label: AppStrings.brandOptional,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          PantryAvailabilityChips(
+            selected: _availabilityStatus,
+            onSelected: (value) => setState(() {
+              _availabilityStatus = value;
+              _error = null;
+            }),
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          QuantityWithUnitField(
+            controller: _quantity,
+            label: AppStrings.quantity,
+            unit: _unit,
+            onUnitChanged: (v) => setState(() {
+              _unit = v;
+              if (PantryUnits.family(_lowStockUnit) != PantryUnits.family(v)) {
+                _lowStockUnit = v;
+              }
+            }),
+            validator: _validateQuantity,
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          QuantityWithUnitField(
+            controller: _threshold,
+            label: AppStrings.lowStockAlert,
+            unit: _lowStockUnit,
+            unitOptions: PantryUnits.compatibleWith(_unit),
+            onUnitChanged: (v) => setState(() => _lowStockUnit = v),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              AppStrings.lowStockAlertOptionalHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_expiryDate != null)
-                        IconButton(
-                          onPressed: () => setState(() => _expiryDate = null),
-                          icon: const Icon(Icons.clear),
-                        ),
-                      const Icon(Icons.calendar_today_outlined),
-                    ],
-                  ),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _expiryDate ?? DateTime.now(),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
-                    );
-                    if (picked != null) setState(() => _expiryDate = picked);
-                  },
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ],
-                const SizedBox(height: 24),
-                LoadingButton(
-                  label: AppStrings.save,
-                  isLoading: _loading,
-                  onPressed: _save,
-                ),
-              ],
             ),
           ),
-        ),
+          const SizedBox(height: kFormFieldSpacing),
+          DropdownButtonFormField<String>(
+            value: _category,
+            decoration: const InputDecoration(labelText: AppStrings.category),
+            items: PantryCategories.values
+                .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                .toList(),
+            onChanged: (v) => setState(() => _category = v),
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(AppStrings.expiryDate),
+            subtitle: Text(
+              _expiryDate == null
+                  ? AppStrings.notSet
+                  : Formatters.date(_expiryDate!),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_expiryDate != null)
+                  IconButton(
+                    onPressed: () => setState(() => _expiryDate = null),
+                    icon: const Icon(Icons.clear),
+                  ),
+                const Icon(Icons.calendar_today_outlined),
+              ],
+            ),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _expiryDate ?? DateTime.now(),
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+              );
+              if (picked != null) setState(() => _expiryDate = picked);
+            },
+          ),
+          const SizedBox(height: 24),
+          FormSaveSection(
+            error: _error,
+            saveLabel: AppStrings.save,
+            isLoading: _loading,
+            onSave: _save,
+          ),
+        ],
       ),
     );
   }

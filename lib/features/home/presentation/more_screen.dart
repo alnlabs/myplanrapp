@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/constants/nav_features.dart';
+import '../../../shared/utils/shell_navigation.dart';
 import '../../../shared/widgets/secret_tap.dart';
 import '../../feedback/presentation/feedback_screen.dart';
 import '../../household/data/household_settings_repository.dart';
@@ -26,7 +27,7 @@ class MoreScreen extends ConsumerWidget {
             color: theme.colorScheme.primary,
             title: feature.label,
             subtitle: feature.hint,
-            onTap: () => context.go(feature.path),
+            onTap: () => context.go(shellRouteFromMore(feature.path)),
           ),
         )
         .toList();

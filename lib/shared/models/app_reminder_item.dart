@@ -12,6 +12,7 @@ class AppReminderItem {
     required this.sourceId,
     required this.title,
     this.subtitle,
+    this.notes,
     this.reminderAt,
     this.isRepeating = false,
     this.timeLabel,
@@ -24,6 +25,7 @@ class AppReminderItem {
   final String sourceId;
   final String title;
   final String? subtitle;
+  final String? notes;
   final DateTime? reminderAt;
   final bool isRepeating;
   final String? timeLabel;

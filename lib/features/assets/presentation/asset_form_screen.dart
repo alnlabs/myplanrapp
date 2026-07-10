@@ -6,9 +6,10 @@ import '../../../shared/constants/asset_constants.dart';
 import '../../../shared/models/home_asset.dart';
 import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/utils/offline_guard.dart';
+import '../../../shared/utils/formatters.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
-import '../../../shared/widgets/loading_button.dart';
+import '../../../shared/widgets/form_screen_body.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/asset_repository.dart';
 
@@ -80,6 +81,9 @@ class _AssetFormScreenState extends ConsumerState<AssetFormScreen> {
     _warrantyStart = asset.warrantyStart;
     _warrantyEnd = asset.warrantyEnd;
     _loaded = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _pickDate(void Function(DateTime?) setter, DateTime? initial) async {
@@ -152,97 +156,173 @@ class _AssetFormScreenState extends ConsumerState<AssetFormScreen> {
       ref.watch(homeAssetProvider(widget.assetId!)).whenData((a) {
         if (a != null) _load(a);
       });
+      if (!_loaded) {
+        final assetAsync = ref.watch(homeAssetProvider(widget.assetId!));
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(_isEdit ? AppStrings.editAsset : AppStrings.addAsset),
+          ),
+          body: assetAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, __) => Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(AppStrings.errorGeneric),
+                  TextButton(
+                    onPressed: () =>
+                        ref.invalidate(homeAssetProvider(widget.assetId!)),
+                    child: const Text(AppStrings.retry),
+                  ),
+                ],
+              ),
+            ),
+            data: (asset) {
+              if (asset == null) {
+                return Center(child: Text(AppStrings.errorGeneric));
+              }
+              return const Center(child: CircularProgressIndicator());
+            },
+          ),
+        );
+      }
     }
 
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEdit ? AppStrings.editAsset : AppStrings.addAsset),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
+      body: FormScreenBody(
+        formKey: _formKey,
         children: [
-          Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-              AppTextField(
-                controller: _name,
-                label: AppStrings.assetName,
-                validator: Validators.required,
-              ),
-              const SizedBox(height: 16),
-              AppTextField(controller: _description, label: AppStrings.descriptionOptional, maxLines: 2),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _category,
-                decoration: const InputDecoration(labelText: AppStrings.assetCategory),
-                items: AssetCategories.all
-                    .map((c) => DropdownMenuItem(value: c.value, child: Text(c.label)))
-                    .toList(),
-                onChanged: (v) => setState(() => _category = v!),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _itemKind,
-                decoration: const InputDecoration(labelText: AppStrings.assetKind),
-                items: AssetKinds.all
-                    .map((k) => DropdownMenuItem(value: k.value, child: Text(k.label)))
-                    .toList(),
-                onChanged: (v) => setState(() => _itemKind = v!),
-              ),
-              const SizedBox(height: 16),
-              AppTextField(controller: _location, label: AppStrings.assetLocation),
-              const SizedBox(height: 24),
-              Text(AppStrings.purchaseInfo, style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 12),
-              AppTextField(controller: _vendorName, label: AppStrings.whereBought),
-              const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text(AppStrings.purchaseDate),
-                subtitle: Text(_purchaseDate?.toString().split(' ').first ?? AppStrings.none),
-                trailing: IconButton(
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  onPressed: () => _pickDate((d) => _purchaseDate = d, _purchaseDate),
-                ),
-              ),
-              AppTextField(
-                controller: _purchaseAmount,
-                label: AppStrings.purchaseAmount,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 24),
-              Text(AppStrings.warranty, style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 12),
-              AppTextField(controller: _warrantyProvider, label: AppStrings.warrantyProvider),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text(AppStrings.warrantyStart),
-                subtitle: Text(_warrantyStart?.toString().split(' ').first ?? AppStrings.none),
-                trailing: IconButton(
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  onPressed: () => _pickDate((d) => _warrantyStart = d, _warrantyStart),
-                ),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text(AppStrings.warrantyEnd),
-                subtitle: Text(_warrantyEnd?.toString().split(' ').first ?? AppStrings.none),
-                trailing: IconButton(
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  onPressed: () => _pickDate((d) => _warrantyEnd = d, _warrantyEnd),
-                ),
-              ),
-              AppTextField(controller: _warrantyNotes, label: AppStrings.warrantyNotes, maxLines: 2),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              ],
-              const SizedBox(height: 24),
-              LoadingButton(label: AppStrings.save, isLoading: _loading, onPressed: _submit),
-              ],
+          AppTextField(
+            controller: _name,
+            label: AppStrings.assetName,
+            helperText: AppStrings.assetNameHint,
+            validator: Validators.required,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          AppTextField(
+            controller: _description,
+            label: AppStrings.descriptionOptional,
+            maxLines: 2,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          DropdownButtonFormField<String>(
+            value: _category,
+            decoration: const InputDecoration(
+              labelText: AppStrings.assetCategory,
+              helperText: AppStrings.assetCategoryHint,
             ),
+            items: AssetCategories.all
+                .map((c) =>
+                    DropdownMenuItem(value: c.value, child: Text(c.label)))
+                .toList(),
+            onChanged: (v) => setState(() => _category = v!),
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          DropdownButtonFormField<String>(
+            value: _itemKind,
+            decoration: const InputDecoration(
+              labelText: AppStrings.assetKind,
+              helperText: AppStrings.assetKindHint,
+            ),
+            items: AssetKinds.all
+                .map((k) =>
+                    DropdownMenuItem(value: k.value, child: Text(k.label)))
+                .toList(),
+            onChanged: (v) => setState(() => _itemKind = v!),
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          AppTextField(
+            controller: _location,
+            label: AppStrings.assetLocation,
+            helperText: AppStrings.assetLocationHint,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 24),
+          Text(AppStrings.purchaseInfo,
+              style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 12),
+          AppTextField(
+            controller: _vendorName,
+            label: AppStrings.whereBought,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(AppStrings.purchaseDate),
+            subtitle: Text(
+              _purchaseDate != null
+                  ? Formatters.date(_purchaseDate!)
+                  : AppStrings.notSet,
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.calendar_today_outlined),
+              onPressed: () =>
+                  _pickDate((d) => _purchaseDate = d, _purchaseDate),
+            ),
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          AppTextField(
+            controller: _purchaseAmount,
+            label: AppStrings.purchaseAmount,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+          ),
+          const SizedBox(height: 24),
+          Text(AppStrings.warranty,
+              style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 12),
+          AppTextField(
+            controller: _warrantyProvider,
+            label: AppStrings.warrantyProvider,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(AppStrings.warrantyStart),
+            subtitle: Text(
+              _warrantyStart != null
+                  ? Formatters.date(_warrantyStart!)
+                  : AppStrings.notSet,
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.calendar_today_outlined),
+              onPressed: () =>
+                  _pickDate((d) => _warrantyStart = d, _warrantyStart),
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(AppStrings.warrantyEnd),
+            subtitle: Text(
+              _warrantyEnd != null
+                  ? Formatters.date(_warrantyEnd!)
+                  : AppStrings.notSet,
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.calendar_today_outlined),
+              onPressed: () =>
+                  _pickDate((d) => _warrantyEnd = d, _warrantyEnd),
+            ),
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          AppTextField(
+            controller: _warrantyNotes,
+            label: AppStrings.warrantyNotes,
+            maxLines: 2,
+          ),
+          const SizedBox(height: 24),
+          FormSaveSection(
+            error: _error,
+            saveLabel: AppStrings.save,
+            isLoading: _loading,
+            onSave: _submit,
           ),
         ],
       ),

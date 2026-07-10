@@ -7,6 +7,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../shared/constants/storage_constants.dart';
 import '../../../shared/models/asset_attachment.dart';
 import '../../../shared/utils/api_error_formatter.dart';
+import '../../../shared/utils/app_bottom_sheet.dart';
 import '../data/attachment_repository.dart';
 
 class AssetAttachmentsSection extends ConsumerStatefulWidget {
@@ -34,7 +35,7 @@ class _AssetAttachmentsSectionState extends ConsumerState<AssetAttachmentsSectio
       _error = null;
     });
 
-    final type = await showModalBottomSheet<String>(
+    final type = await showAppBottomSheet<String>(
       context: context,
       builder: (context) => SafeArea(
         child: Column(
@@ -61,7 +62,7 @@ class _AssetAttachmentsSectionState extends ConsumerState<AssetAttachmentsSectio
     );
     if (type == null || !mounted) return;
 
-    final source = await showModalBottomSheet<ImageSource>(
+    final source = await showAppBottomSheet<ImageSource>(
       context: context,
       builder: (context) => SafeArea(
         child: Column(

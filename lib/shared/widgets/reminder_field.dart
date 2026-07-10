@@ -13,6 +13,7 @@ class ReminderField extends StatelessWidget {
     required this.onReminderAtChanged,
     this.subtitle,
     this.firstDate,
+    this.errorText,
   });
 
   final bool enabled;
@@ -21,6 +22,7 @@ class ReminderField extends StatelessWidget {
   final ValueChanged<DateTime?> onReminderAtChanged;
   final String? subtitle;
   final DateTime? firstDate;
+  final String? errorText;
 
   Future<void> _pick(BuildContext context) async {
     final picked = await pickDateTime(
@@ -57,11 +59,23 @@ class ReminderField extends StatelessWidget {
             subtitle: Text(
               reminderAt != null
                   ? Formatters.dateTime(reminderAt!.toLocal())
-                  : 'Tap to set date & time',
+                  : AppStrings.tapToSetDateTime,
             ),
             trailing: const Icon(Icons.edit_calendar_outlined),
             onTap: () => _pick(context),
           ),
+        if (errorText != null) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Text(
+              errorText!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+            ),
+          ),
+        ],
       ],
     );
   }

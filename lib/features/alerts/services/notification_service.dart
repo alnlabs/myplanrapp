@@ -5,6 +5,8 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../core/logging/app_logger.dart';
+import '../data/notification_alert_type.dart';
+import '../data/notification_sound_settings.dart';
 
 const _notificationsEnabledKey = 'notifications_enabled';
 
@@ -159,26 +161,50 @@ class NotificationService {
 
   int _notificationId(String key) => key.hashCode.abs() % 100000;
 
+  Future<NotificationDetails> _detailsFor(
+    NotificationAlertType alertType, {
+    required Importance importance,
+    required Priority priority,
+    String? iosSubtitle,
+  }) async {
+    final settings = await NotificationSoundSettings.load();
+    final soundPreference = settings.preference(alertType);
+    final channelId = NotificationSoundSettings.androidChannelId(
+      alertType,
+      soundPreference,
+    );
+
+    AndroidNotificationSound? androidSound;
+    final uri = soundPreference.uri;
+    if (uri != null && uri.isNotEmpty) {
+      androidSound = UriAndroidNotificationSound(uri);
+    }
+
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        channelId,
+        alertType.channelName,
+        channelDescription: alertType.channelDescription,
+        importance: importance,
+        priority: priority,
+        sound: androidSound,
+      ),
+      iOS: DarwinNotificationDetails(subtitle: iosSubtitle),
+    );
+  }
+
   Future<void> showLowStockAlert({
     required String itemId,
     required String title,
     required String body,
   }) async {
     if (!await _notificationsAllowed()) return;
-    await _plugin.show(
-      _notificationId(itemId),
-      title,
-      body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'low_stock',
-          'Low stock alerts',
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
-        ),
-        iOS: DarwinNotificationDetails(),
-      ),
+    final details = await _detailsFor(
+      NotificationAlertType.lowStock,
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
     );
+    await _plugin.show(_notificationId(itemId), title, body, details);
   }
 
   Future<void> schedulePlanReminder({
@@ -195,15 +221,11 @@ class NotificationService {
       title: 'Plan reminder',
       body: title,
       scheduled: scheduled,
-      details: NotificationDetails(
-        android: const AndroidNotificationDetails(
-          'plan_reminders',
-          'Plan reminders',
-          channelDescription: 'Reminders for plans and tasks',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(subtitle: body),
+      details: await _detailsFor(
+        NotificationAlertType.planReminders,
+        importance: Importance.high,
+        priority: Priority.high,
+        iosSubtitle: body,
       ),
     );
   }
@@ -226,15 +248,11 @@ class NotificationService {
       title: 'Bill reminder',
       body: title,
       scheduled: scheduled,
-      details: NotificationDetails(
-        android: const AndroidNotificationDetails(
-          'subscription_reminders',
-          'Subscription reminders',
-          channelDescription: 'Reminders for recurring bills and subscriptions',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(subtitle: body),
+      details: await _detailsFor(
+        NotificationAlertType.subscriptionReminders,
+        importance: Importance.high,
+        priority: Priority.high,
+        iosSubtitle: body,
       ),
     );
   }
@@ -271,15 +289,11 @@ class NotificationService {
       title: 'Medicine reminder',
       body: title,
       scheduled: scheduled,
-      details: NotificationDetails(
-        android: const AndroidNotificationDetails(
-          'medicine_reminders',
-          'Medicine reminders',
-          channelDescription: 'Daily medicine schedule reminders',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(subtitle: body),
+      details: await _detailsFor(
+        NotificationAlertType.medicineReminders,
+        importance: Importance.high,
+        priority: Priority.high,
+        iosSubtitle: body,
       ),
       matchDateTimeComponents: DateTimeComponents.time,
     );
@@ -305,20 +319,66 @@ class NotificationService {
       title: 'Reminder',
       body: title,
       scheduled: scheduled,
-      details: NotificationDetails(
-        android: const AndroidNotificationDetails(
-          'standalone_reminders',
-          'Reminders',
-          channelDescription: 'General reminders you create in MyPlanr',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(subtitle: body),
+      details: await _detailsFor(
+        NotificationAlertType.standaloneReminders,
+        importance: Importance.high,
+        priority: Priority.high,
+        iosSubtitle: body,
       ),
     );
   }
 
   Future<void> cancelStandaloneReminder(String reminderId) async {
     await _plugin.cancel(_notificationId('rem_$reminderId'));
+  }
+
+  /// Plays a one-shot preview using the saved sound for [alertType].
+  Future<bool> previewAlertSound(NotificationAlertType alertType) async {
+    if (!await _notificationsAllowed()) return false;
+    if (!_initialized) await initialize();
+
+    final android = _android;
+    if (android != null) {
+      final granted = await android.areNotificationsEnabled();
+      if (granted != true) return false;
+    }
+
+    final details = await _detailsFor(
+      alertType,
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    await _plugin.show(
+      _notificationId('preview_${alertType.id}'),
+      alertType.previewTitle,
+      alertType.previewBody,
+      details,
+    );
+    return true;
+  }
+
+  /// Immediate notification to verify device alerts are working.
+  Future<bool> showTestAlert() async {
+    if (!await _notificationsAllowed()) return false;
+    if (!_initialized) await initialize();
+
+    final android = _android;
+    if (android != null) {
+      final granted = await android.areNotificationsEnabled();
+      if (granted != true) return false;
+    }
+
+    final details = await _detailsFor(
+      NotificationAlertType.testAlerts,
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    await _plugin.show(
+      _notificationId('test_alert'),
+      NotificationAlertType.testAlerts.previewTitle,
+      'If you see this, device reminders are working on this phone.',
+      details,
+    );
+    return true;
   }
 }

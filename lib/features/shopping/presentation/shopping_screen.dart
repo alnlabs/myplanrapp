@@ -4,12 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/models/shopping_list_item.dart';
 import '../../../shared/utils/formatters.dart';
+import '../../../shared/utils/list_sharing.dart';
+import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../../../shared/widgets/async_screen_body.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../pantry/data/pantry_items_list_provider.dart';
 import '../../pantry/data/pantry_repository.dart';
+import '../data/shopping_list_provider.dart';
 import '../data/shopping_repository.dart';
 
-enum _ShopMenuAction { addLowStock, clearBought }
+enum _ShopMenuAction { shareList }
 
 class ShoppingScreen extends ConsumerStatefulWidget {
   const ShoppingScreen({super.key});
@@ -21,6 +25,7 @@ class ShoppingScreen extends ConsumerStatefulWidget {
 class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   final _nameController = TextEditingController();
   bool _restockOnBuy = true;
+  bool _initialShopSyncDone = false;
 
   @override
   void dispose() {
@@ -51,52 +56,66 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     }
   }
 
-  Future<void> _addLowStock() async {
-    final householdId = await _householdId();
-    if (householdId == null) return;
-    await ref.read(shoppingRepositoryProvider).generateFromLowStock(householdId);
-    ref.invalidate(shoppingListProvider);
-  }
+  Future<void> _shareList(List<ShoppingListItem> items) async {
+    if (items.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.emptyShop)),
+        );
+      }
+      return;
+    }
 
-  Future<void> _clearBought() async {
-    final householdId = await _householdId();
-    if (householdId == null) return;
-    await ref.read(shoppingRepositoryProvider).clearChecked(householdId);
-    ref.invalidate(shoppingListProvider);
+    final text = formatShopListForSharing(
+      title: AppStrings.shopListShareTitle(items.length),
+      itemNames: items.map((item) {
+        final quantity = (item.quantity != null && item.unit != null)
+            ? ' (${Formatters.quantity(item.quantity!, item.unit!)})'
+            : '';
+        return '${item.name}$quantity';
+      }).toList(),
+    );
+
+    await showShareShopListSheet(context, text: text);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_initialShopSyncDone) {
+      _initialShopSyncDone = true;
+      Future.microtask(() => refreshShopFromPantry(ref));
+    }
+
     final itemsAsync = ref.watch(shoppingListProvider);
+    final items = itemsAsync.valueOrNull ?? [];
+    final hasItems = items.isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.shopTitle),
+      appBar: FeatureScreenAppBar.forShellRoute(
+        context,
+        title: AppStrings.shopTitle,
+        subtitle: AppStrings.shopSubtitle,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.share_outlined),
+            tooltip: AppStrings.shareShopList,
+            onPressed: hasItems ? () => _shareList(items) : null,
+          ),
           PopupMenuButton<_ShopMenuAction>(
             onSelected: (action) {
               switch (action) {
-                case _ShopMenuAction.addLowStock:
-                  _addLowStock();
-                case _ShopMenuAction.clearBought:
-                  _clearBought();
+                case _ShopMenuAction.shareList:
+                  _shareList(items);
               }
             },
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem(
-                value: _ShopMenuAction.addLowStock,
-                child: ListTile(
+                value: _ShopMenuAction.shareList,
+                enabled: hasItems,
+                child: const ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.inventory_2_outlined),
-                  title: Text(AppStrings.generateFromLowStock),
-                ),
-              ),
-              PopupMenuItem(
-                value: _ShopMenuAction.clearBought,
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.delete_sweep_outlined),
-                  title: Text(AppStrings.clearChecked),
+                  leading: Icon(Icons.share_outlined),
+                  title: Text(AppStrings.shareShopList),
                 ),
               ),
             ],
@@ -117,6 +136,13 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
+                final profile = await ref.read(userProfileProvider.future);
+                final householdId = profile?.activeHouseholdId;
+                if (householdId != null) {
+                  await ref
+                      .read(shoppingRepositoryProvider)
+                      .syncLowStockToShop(householdId);
+                }
                 ref.invalidate(shoppingListProvider);
                 await ref.read(shoppingListProvider.future);
               },
@@ -215,40 +241,23 @@ class _ShoppingList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final toBuy = items.where((i) => !i.isChecked).toList();
-    final bought = items.where((i) => i.isChecked).toList();
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         _SectionLabel(
           label: AppStrings.shopToBuy,
-          count: toBuy.length,
+          count: items.length,
         ),
         const SizedBox(height: 8),
-        if (toBuy.isEmpty)
+        if (items.isEmpty)
           const _EmptyRow(text: AppStrings.emptyShopHint)
         else
-          ...toBuy.map(
+          ...items.map(
             (item) => _ShopItemTile(
               item: item,
               restockOnBuy: restockOnBuy,
             ),
           ),
-        if (bought.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          _SectionLabel(
-            label: AppStrings.shopBought,
-            count: bought.length,
-          ),
-          const SizedBox(height: 8),
-          ...bought.map(
-            (item) => _ShopItemTile(
-              item: item,
-              restockOnBuy: restockOnBuy,
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -319,7 +328,7 @@ class _ShopItemTile extends ConsumerWidget {
   ({IconData icon, String label}) get _source {
     return switch (item.source) {
       'low_stock' => (icon: Icons.inventory_2_outlined, label: AppStrings.sourceLowStock),
-      'recipe' => (icon: Icons.receipt_long_outlined, label: AppStrings.sourceRecipe),
+      'recipe' => (icon: Icons.restaurant_outlined, label: AppStrings.sourceMealPlan),
       _ => (icon: Icons.edit_outlined, label: AppStrings.sourceManual),
     };
   }
@@ -329,19 +338,15 @@ class _ShopItemTile extends ConsumerWidget {
     ref.invalidate(shoppingListProvider);
   }
 
-  Future<void> _toggle(WidgetRef ref, bool checked) async {
-    if (checked && !item.isChecked) {
-      await ref.read(shoppingRepositoryProvider).completeItem(
-            item.id,
-            restock: restockOnBuy,
-          );
-      ref.invalidate(shoppingListProvider);
-      ref.invalidate(pantryItemsProvider);
-      ref.invalidate(lowStockItemsProvider);
-    } else if (!checked) {
-      await ref.read(shoppingRepositoryProvider).toggleChecked(item.id, false);
-      ref.invalidate(shoppingListProvider);
-    }
+  Future<void> _buy(WidgetRef ref) async {
+    await ref.read(shoppingRepositoryProvider).completeItem(
+          item.id,
+          restock: restockOnBuy,
+          pantryItemId: item.pantryItemId,
+        );
+    ref.invalidate(shoppingListProvider);
+    await refreshPantryList(ref);
+    ref.invalidate(lowStockItemsProvider);
   }
 
   @override
@@ -370,14 +375,14 @@ class _ShopItemTile extends ConsumerWidget {
         margin: const EdgeInsets.only(bottom: 8),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () => _toggle(ref, !item.isChecked),
+          onTap: () => _buy(ref),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(
               children: [
                 Checkbox(
-                  value: item.isChecked,
-                  onChanged: (v) => _toggle(ref, v ?? false),
+                  value: false,
+                  onChanged: (_) => _buy(ref),
                 ),
                 Expanded(
                   child: Column(
@@ -386,10 +391,6 @@ class _ShopItemTile extends ConsumerWidget {
                       Text(
                         item.name,
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          decoration: item.isChecked
-                              ? TextDecoration.lineThrough
-                              : null,
-                          color: item.isChecked ? theme.colorScheme.outline : null,
                           fontWeight: FontWeight.w500,
                         ),
                       ),

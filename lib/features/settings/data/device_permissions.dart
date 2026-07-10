@@ -117,3 +117,17 @@ final devicePermissionsProvider =
     FutureProvider.autoDispose<List<AppPermissionInfo>>((ref) async {
   return ref.watch(devicePermissionsServiceProvider).load();
 });
+
+/// Permissions that block device reminders (notifications, exact alarms).
+final deviceReminderBlockersProvider =
+    FutureProvider.autoDispose<List<AppPermissionInfo>>((ref) async {
+  final permissions = await ref.watch(devicePermissionsProvider.future);
+  return permissions
+      .where(
+        (p) =>
+            !p.isGranted &&
+            (p.kind == AppPermissionKind.notifications ||
+                p.kind == AppPermissionKind.exactAlarms),
+      )
+      .toList();
+});

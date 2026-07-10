@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/constants/asset_constants.dart';
 import '../../../shared/models/home_asset.dart';
+import '../../../shared/providers/list_display_mode_provider.dart';
 import '../../../shared/widgets/async_screen_body.dart';
+import '../../../shared/widgets/compact_grid_card.dart';
+import '../../../shared/widgets/list_grid_layout.dart';
 import '../data/asset_repository.dart';
 import 'asset_detail_screen.dart';
 
@@ -16,6 +19,8 @@ class AssetsListTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final assetsAsync = ref.watch(homeAssetsProvider);
+    final viewMode =
+        ref.watch(listDisplayModeProvider(ListDisplayModeKeys.assets));
 
     return AsyncScreenBody(
       value: assetsAsync,
@@ -33,29 +38,45 @@ class AssetsListTab extends ConsumerWidget {
             ],
           );
         }
+
+        if (viewMode == ListDisplayMode.list) {
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+            itemCount: filtered.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final asset = filtered[index];
+              return _AssetListTile(
+                asset: asset,
+                icon: _iconFor(asset.category),
+                onTap: () => _openAsset(context, asset),
+              );
+            },
+          );
+        }
+
         return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 118,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            mainAxisExtent: 124,
-          ),
+          padding: ListGridLayout.padding,
+          gridDelegate: ListGridLayout.tabGridDelegate,
           itemCount: filtered.length,
           itemBuilder: (context, index) {
             final asset = filtered[index];
             return _AssetGridCard(
               asset: asset,
               icon: _iconFor(asset.category),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => AssetDetailScreen(assetId: asset.id),
-                ),
-              ),
+              onTap: () => _openAsset(context, asset),
             );
           },
         );
       },
+    );
+  }
+
+  void _openAsset(BuildContext context, HomeAsset asset) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AssetDetailScreen(assetId: asset.id),
+      ),
     );
   }
 
@@ -66,7 +87,9 @@ class AssetsListTab extends ConsumerWidget {
           (a) =>
               a.name.toLowerCase().contains(query) ||
               (a.location?.toLowerCase().contains(query) ?? false) ||
-              AssetCategories.labelFor(a.category).toLowerCase().contains(query),
+              AssetCategories.labelFor(a.category)
+                  .toLowerCase()
+                  .contains(query),
         )
         .toList();
   }
@@ -80,6 +103,97 @@ class AssetsListTab extends ConsumerWidget {
       };
 }
 
+Color _warrantyColor(WarrantyStatus status) => switch (status) {
+      WarrantyStatus.valid => Colors.green.shade700,
+      WarrantyStatus.expiring => Colors.amber.shade800,
+      WarrantyStatus.expired => Colors.red.shade700,
+      WarrantyStatus.none => Colors.grey,
+    };
+
+class _AssetListTile extends StatelessWidget {
+  const _AssetListTile({
+    required this.asset,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final HomeAsset asset;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final subtitleParts = [
+      AssetCategories.labelFor(asset.category),
+      if (asset.location != null) asset.location!,
+      if (asset.warrantyStatus != WarrantyStatus.none)
+        switch (asset.warrantyStatus) {
+          WarrantyStatus.valid => AppStrings.warrantyValid,
+          WarrantyStatus.expiring => AppStrings.warrantyExpiring,
+          WarrantyStatus.expired => AppStrings.warrantyExpired,
+          WarrantyStatus.none => '',
+        },
+    ];
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          leading: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: theme.colorScheme.secondaryContainer,
+                child: Icon(
+                  icon,
+                  color: theme.colorScheme.onSecondaryContainer,
+                  size: 20,
+                ),
+              ),
+              if (asset.warrantyStatus != WarrantyStatus.none)
+                Positioned(
+                  right: -1,
+                  top: -1,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: _warrantyColor(asset.warrantyStatus),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: theme.colorScheme.surface,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          title: Text(
+            asset.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            subtitleParts.join(' · '),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: const Icon(Icons.chevron_right, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
 class _AssetGridCard extends StatelessWidget {
   const _AssetGridCard({
     required this.asset,
@@ -91,87 +205,25 @@ class _AssetGridCard extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  Color _warrantyColor(WarrantyStatus status) => switch (status) {
-        WarrantyStatus.valid => Colors.green.shade700,
-        WarrantyStatus.expiring => Colors.amber.shade800,
-        WarrantyStatus.expired => Colors.red.shade700,
-        WarrantyStatus.none => Colors.grey,
-      };
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: theme.colorScheme.secondaryContainer,
-                    child: Icon(
-                      icon,
-                      color: theme.colorScheme.onSecondaryContainer,
-                      size: 22,
-                    ),
-                  ),
-                  if (asset.warrantyStatus != WarrantyStatus.none)
-                    Positioned(
-                      right: -1,
-                      top: -1,
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: _warrantyColor(asset.warrantyStatus),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: theme.colorScheme.surface,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                asset.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                [
-                  AssetCategories.labelFor(asset.category),
-                  if (asset.location != null) asset.location!,
-                ].join(' · '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
+    return CompactGridCard(
+      onTap: onTap,
+      leading: CompactGridIcon(
+        icon: icon,
+        color: theme.colorScheme.onSecondaryContainer,
+        backgroundColor: theme.colorScheme.secondaryContainer,
+        badgeColor: asset.warrantyStatus != WarrantyStatus.none
+            ? _warrantyColor(asset.warrantyStatus)
+            : null,
       ),
+      title: asset.name,
+      subtitle: [
+        AssetCategories.labelFor(asset.category),
+        if (asset.location != null) asset.location!,
+      ].join(' · '),
     );
   }
 }

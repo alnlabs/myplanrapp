@@ -6,7 +6,13 @@ import '../../features/auth/presentation/account_restore_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
+import '../../features/expenses/presentation/add_recurring_expense_screen.dart';
+import '../../features/expenses/presentation/expense_group_detail_screen.dart';
+import '../../features/expenses/presentation/expense_group_form_screen.dart';
+import '../../features/expenses/presentation/expense_groups_screen.dart';
+import '../../features/expenses/presentation/expense_settlement_screen.dart';
 import '../../features/expenses/presentation/expenses_screen.dart';
+import '../../features/expenses/presentation/recurring_expenses_screen.dart';
 import '../../features/home/presentation/dashboard_screen.dart';
 import '../../features/home/presentation/home_shell.dart';
 import '../../features/home/presentation/more_screen.dart';
@@ -16,11 +22,10 @@ import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/onboarding/providers/onboarding_provider.dart';
 import '../../features/pantry/presentation/pantry_item_form_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
+import '../../features/plans/data/todo_reminders_filter.dart';
 import '../../features/plans/presentation/plan_form_screen.dart';
 import '../../features/plans/presentation/plans_screen.dart';
-import '../../features/recipes/presentation/recipes_screen.dart';
 import '../../features/reminders/presentation/reminder_form_screen.dart';
-import '../../features/reminders/presentation/reminders_screen.dart';
 import '../../features/shopping/presentation/shopping_screen.dart';
 import '../../features/subscriptions/presentation/subscription_form_screen.dart';
 import '../../features/subscriptions/presentation/subscriptions_screen.dart';
@@ -37,6 +42,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       final onboardingDone = onboardingAsync.valueOrNull ?? false;
       final session = authState.valueOrNull?.session;
       final path = state.matchedLocation;
+
+      // Reminders merged into the To-do tab.
+      if (path == '/reminders') {
+        final filter = state.uri.queryParameters['filter'] ?? 'reminders';
+        return '/plans?filter=$filter';
+      }
+
       final isOnboarding = path == '/onboarding';
       final isAuthRoute =
           path == '/login' ||
@@ -113,7 +125,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/plans/add',
-        builder: (_, __) => const PlanFormScreen(),
+        builder: (context, state) {
+          final type = state.uri.queryParameters['type'];
+          final slot = state.uri.queryParameters['slot'];
+          return PlanFormScreen(
+            initialPlanType: type,
+            initialMealSlot: slot,
+          );
+        },
       ),
       GoRoute(
         path: '/setup-wizard',
@@ -144,6 +163,36 @@ final routerProvider = Provider<GoRouter>((ref) {
           return ReminderFormScreen(standaloneId: id);
         },
       ),
+      GoRoute(
+        path: '/expenses/groups',
+        builder: (_, __) => const ExpenseGroupsScreen(),
+      ),
+      GoRoute(
+        path: '/expenses/groups/add',
+        builder: (_, __) => const ExpenseGroupFormScreen(),
+      ),
+      GoRoute(
+        path: '/expenses/groups/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return ExpenseGroupDetailScreen(groupId: id);
+        },
+      ),
+      GoRoute(
+        path: '/expenses/groups/:id/settle',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return ExpenseSettlementScreen(groupId: id);
+        },
+      ),
+      GoRoute(
+        path: '/expenses/recurring',
+        builder: (_, __) => const RecurringExpensesScreen(),
+      ),
+      GoRoute(
+        path: '/expenses/recurring/add',
+        builder: (_, __) => const AddRecurringExpenseScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return HomeShell(navigationShell: navigationShell);
@@ -161,7 +210,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/pantry',
-                builder: (_, __) => const InventoryScreen(),
+                builder: (context, state) {
+                  final segment = state.uri.queryParameters['segment'];
+                  return InventoryScreen(
+                    initialSegment: segment == 'assets'
+                        ? InventorySegment.assets
+                        : InventorySegment.food,
+                  );
+                },
               ),
             ],
           ),
@@ -169,7 +225,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/plans',
-                builder: (_, __) => const PlansScreen(),
+                builder: (context, state) {
+                  final filter = TodoRemindersFilter.fromQuery(
+                    state.uri.queryParameters['filter'],
+                  );
+                  return PlansScreen(
+                    initialFilter: filter ?? TodoRemindersFilter.all,
+                  );
+                },
               ),
             ],
           ),
@@ -186,22 +249,6 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/subscriptions',
                 builder: (_, __) => const SubscriptionsScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/reminders',
-                builder: (_, __) => const RemindersScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/recipes',
-                builder: (_, __) => const RecipesScreen(),
               ),
             ],
           ),

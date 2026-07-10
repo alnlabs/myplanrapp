@@ -18,6 +18,8 @@ class Subscription {
     this.lastPaidExpenseId,
     this.isActive = true,
     this.notes,
+    this.paymentMethod,
+    this.paymentDetail,
   });
 
   final String id;
@@ -36,6 +38,16 @@ class Subscription {
   final String? lastPaidExpenseId;
   final bool isActive;
   final String? notes;
+  final String? paymentMethod;
+  final String? paymentDetail;
+
+  String? get paymentSummary {
+    if (paymentMethod == null) return null;
+    final method = PaymentMethods.labelFor(paymentMethod!);
+    final detail = paymentDetail?.trim();
+    if (detail != null && detail.isNotEmpty) return '$method · $detail';
+    return method;
+  }
 
   DateTime get nextDueDate => computeNextDueDate(
         billingCycle: billingCycle,
@@ -105,6 +117,8 @@ class Subscription {
       lastPaidExpenseId: json['last_paid_expense_id'] as String?,
       isActive: json['is_active'] as bool? ?? true,
       notes: json['notes'] as String?,
+      paymentMethod: json['payment_method'] as String?,
+      paymentDetail: json['payment_detail'] as String?,
     );
   }
 
@@ -124,7 +138,15 @@ class Subscription {
       'reminder_at': reminderEnabled ? reminderAt?.toUtc().toIso8601String() : null,
       'is_active': isActive,
       'notes': notes,
+      'payment_method': paymentMethod,
+      'payment_detail': _emptyToNull(paymentDetail),
     };
+  }
+
+  static String? _emptyToNull(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return trimmed;
   }
 
   static DateTime computeNextDueDate({

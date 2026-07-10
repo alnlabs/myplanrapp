@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/env.dart';
 import 'core/logging/app_logger.dart';
+import 'core/network/timeout_http_client.dart';
 import 'core/providers/supabase_providers.dart';
 import 'core/providers/theme_mode_provider.dart';
 import 'core/router/app_router.dart';
@@ -83,6 +84,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
         await Supabase.initialize(
           url: Env.supabaseUrl,
           publishableKey: Env.supabaseAnonKey,
+          httpClient: TimeoutHttpClient(),
           authOptions: const FlutterAuthClientOptions(
             authFlowType: AuthFlowType.pkce,
           ),

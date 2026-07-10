@@ -15,6 +15,7 @@ class Plan {
     this.assignedTo,
     this.reminderNotifyUserId,
     this.recipeId,
+    this.mealSlot,
     this.completedAt,
     this.aboutMemberName,
     this.assignedToName,
@@ -35,6 +36,7 @@ class Plan {
   final String? assignedTo;
   final String? reminderNotifyUserId;
   final String? recipeId;
+  final String? mealSlot;
   final DateTime? completedAt;
   final String? aboutMemberName;
   final String? assignedToName;
@@ -66,6 +68,7 @@ class Plan {
       assignedTo: json['assigned_to'] as String?,
       reminderNotifyUserId: json['reminder_notify_user_id'] as String?,
       recipeId: json['recipe_id'] as String?,
+      mealSlot: json['meal_slot'] as String?,
       completedAt: json['completed_at'] != null
           ? DateTime.parse(json['completed_at'] as String)
           : null,
@@ -89,6 +92,7 @@ class Plan {
       'assigned_to': assignedTo,
       'reminder_notify_user_id': reminderNotifyUserId ?? userId,
       'recipe_id': recipeId,
+      'meal_slot': mealSlot,
     };
   }
 
@@ -105,6 +109,7 @@ class Plan {
       'assigned_to': assignedTo,
       'reminder_notify_user_id': reminderNotifyUserId ?? userId,
       'recipe_id': recipeId,
+      'meal_slot': mealSlot,
     };
   }
 }

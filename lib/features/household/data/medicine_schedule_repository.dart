@@ -10,14 +10,16 @@ import '../../auth/data/auth_repository.dart';
 class MedicineReminderToday {
   const MedicineReminderToday({
     required this.scheduleId,
-    required this.medicineName,
+    required this.timeIndex,
+    required this.displayTitle,
     required this.memberName,
     required this.timeLabel,
     this.dosage,
   });
 
   final String scheduleId;
-  final String medicineName;
+  final int timeIndex;
+  final String displayTitle;
   final String memberName;
   final String timeLabel;
   final String? dosage;
@@ -69,13 +71,15 @@ class MedicineScheduleRepository {
 
     for (final schedule in schedules) {
       final memberName = schedule.memberDisplayName ?? 'Family member';
-      for (final rawTime in schedule.timesPerDay) {
+      for (var i = 0; i < schedule.timesPerDay.length; i++) {
+        final rawTime = schedule.timesPerDay[i];
         final parsed = parseScheduleTime(rawTime);
         if (parsed == null) continue;
         items.add(
           MedicineReminderToday(
             scheduleId: schedule.id,
-            medicineName: schedule.medicineName,
+            timeIndex: i,
+            displayTitle: schedule.displayTitle,
             memberName: memberName,
             timeLabel: formatScheduleTime(parsed),
             dosage: schedule.dosage,
@@ -152,7 +156,7 @@ class MedicineScheduleRepository {
       await NotificationService.instance.scheduleMedicineReminder(
         scheduleId: schedule.id,
         timeIndex: i,
-        title: schedule.medicineName,
+        title: schedule.displayTitle,
         body: subtitleParts.isEmpty ? 'Time to take your medicine' : subtitleParts.join(' · '),
         hour: parsed.hour,
         minute: parsed.minute,

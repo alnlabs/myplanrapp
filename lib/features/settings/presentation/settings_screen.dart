@@ -1,8 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/providers/supabase_providers.dart';
 import '../../../core/providers/theme_mode_provider.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/utils/legal_launcher.dart';
@@ -11,8 +13,11 @@ import '../../app_updates/services/app_review_service.dart';
 import '../../app_updates/services/app_update_service.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../data/notification_settings.dart';
+import '../data/device_permissions.dart';
 import 'device_permissions_screen.dart';
+import 'notification_sounds_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -115,10 +120,13 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final notificationsEnabled = ref.watch(notificationsEnabledProvider);
     final profileAsync = ref.watch(userProfileProvider);
-    final email = Supabase.instance.client.auth.currentUser?.email;
+    final email = ref.watch(supabaseClientProvider).auth.currentUser?.email;
 
     return Scaffold(
-      appBar: AppBar(title: const Text(AppStrings.settingsTitle)),
+      appBar: const FeatureScreenAppBar(
+        title: AppStrings.settingsTitle,
+        subtitle: AppStrings.settingsSubtitle,
+      ),
       body: ListView(
         children: [
           const _SectionHeader(title: AppStrings.settingsAccountSection),
@@ -175,6 +183,7 @@ class SettingsScreen extends ConsumerWidget {
               final exactAllowed =
                   await NotificationService.instance.canScheduleExactReminders();
               if (!context.mounted) return;
+              ref.invalidate(deviceReminderBlockersProvider);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
@@ -188,6 +197,36 @@ class SettingsScreen extends ConsumerWidget {
               );
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.campaign_outlined),
+            title: const Text(AppStrings.settingsTestNotification),
+            subtitle: const Text(AppStrings.settingsTestNotificationHint),
+            onTap: () async {
+              final sent = await NotificationService.instance.showTestAlert();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    sent
+                        ? AppStrings.settingsTestNotificationSent
+                        : AppStrings.settingsNotificationPermissionDenied,
+                  ),
+                ),
+              );
+            },
+          ),
+          if (Platform.isAndroid)
+            ListTile(
+              leading: const Icon(Icons.music_note_outlined),
+              title: const Text(AppStrings.notificationSoundsEntry),
+              subtitle: const Text(AppStrings.notificationSoundsEntryHint),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const NotificationSoundsScreen(),
+                ),
+              ),
+            ),
           ListTile(
             leading: const Icon(Icons.security_outlined),
             title: const Text(AppStrings.settingsPermissions),
@@ -235,6 +274,12 @@ class SettingsScreen extends ConsumerWidget {
             leading: Icon(Icons.info_outline),
             title: Text(AppStrings.appName),
             subtitle: Text(AppStrings.appVersion),
+          ),
+          ListTile(
+            leading: const Icon(Icons.language_outlined),
+            title: const Text(AppStrings.builtAndMaintainedBy),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () => openCompanyWebsite(context),
           ),
           const SizedBox(height: 24),
           Padding(

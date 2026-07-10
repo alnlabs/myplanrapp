@@ -1,0 +1,1 @@
+enum PlansFilter { all, meals }
