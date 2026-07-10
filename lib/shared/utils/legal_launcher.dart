@@ -9,6 +9,9 @@ Future<void> openTermsOfService(BuildContext context) =>
 Future<void> openPrivacyPolicy(BuildContext context) =>
     _open(context, LegalUrls.privacyPolicy);
 
+Future<void> openCompanyWebsite(BuildContext context) =>
+    _open(context, LegalUrls.companyWebsite);
+
 Future<void> _open(BuildContext context, Uri url) async {
   final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
   if (!launched && context.mounted) {

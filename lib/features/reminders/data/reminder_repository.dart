@@ -112,6 +112,7 @@ class ReminderRepository {
     required String planId,
     required DateTime reminderAt,
     required bool enabled,
+    String? description,
   }) async {
     final plan = await _ref.read(planRepositoryProvider).fetchPlan(planId);
     if (plan == null) throw Exception('Plan not found');
@@ -123,7 +124,7 @@ class ReminderRepository {
       scope: plan.scope,
       planType: plan.planType,
       title: plan.title,
-      description: plan.description,
+      description: description ?? plan.description,
       status: plan.status,
       dueAt: plan.dueAt,
       reminderEnabled: enabled,
@@ -143,6 +144,7 @@ class ReminderRepository {
     required String subscriptionId,
     required DateTime reminderAt,
     required bool enabled,
+    String? notes,
   }) async {
     final sub =
         await _ref.read(subscriptionRepositoryProvider).fetchSubscription(subscriptionId);
@@ -164,7 +166,9 @@ class ReminderRepository {
       reminderAt: enabled ? reminderAt : null,
       lastPaidExpenseId: sub.lastPaidExpenseId,
       isActive: sub.isActive,
-      notes: sub.notes,
+      notes: notes ?? sub.notes,
+      paymentMethod: sub.paymentMethod,
+      paymentDetail: sub.paymentDetail,
     );
     await _ref.read(subscriptionRepositoryProvider).updateSubscription(updated);
   }
@@ -206,6 +210,7 @@ class ReminderRepository {
                 id: schedule.id,
                 familyMemberId: schedule.familyMemberId,
                 householdId: schedule.householdId,
+                medicineFor: schedule.medicineFor,
                 medicineName: schedule.medicineName,
                 dosage: schedule.dosage,
                 timesPerDay: updatedTimes,
@@ -255,7 +260,8 @@ class ReminderRepository {
             sourceType: ReminderSourceType.standalone,
             sourceId: r.id,
             title: r.title,
-            subtitle: r.notes,
+            subtitle: AppReminderLabels.standalone,
+            notes: r.notes,
             reminderAt: r.reminderAt,
           ),
         )
@@ -277,6 +283,7 @@ class ReminderRepository {
             sourceId: plan.id,
             title: plan.title,
             subtitle: _planTypeLabel(plan.planType),
+            notes: plan.description,
             reminderAt: plan.reminderAt,
           ),
         )
@@ -298,6 +305,7 @@ class ReminderRepository {
             sourceId: sub.id,
             title: sub.name,
             subtitle: AppReminderLabels.subscription,
+            notes: sub.notes,
             reminderAt: sub.effectiveReminderAt,
           ),
         )
@@ -324,7 +332,7 @@ class ReminderRepository {
             id: 'med_${schedule.id}_$i',
             sourceType: ReminderSourceType.medicine,
             sourceId: schedule.id,
-            title: schedule.medicineName,
+            title: schedule.displayTitle,
             subtitle: '$memberName · ${formatScheduleTime(parsed)}',
             reminderAt: _nextDailyOccurrence(parsed.hour, parsed.minute),
             isRepeating: true,
@@ -380,6 +388,7 @@ class AppReminderLabels {
   static const planMedicine = 'Medicine plan';
   static const planPurchase = 'Purchase plan';
   static const planTask = 'Task';
+  static const standalone = 'Custom reminder';
 }
 
 final reminderRepositoryProvider = Provider<ReminderRepository>((ref) {

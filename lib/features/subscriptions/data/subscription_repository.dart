@@ -73,6 +73,13 @@ class SubscriptionRepository {
     await _client.from('subscriptions').delete().eq('id', id);
   }
 
+  Future<void> linkLastPaidExpense(String subscriptionId, String expenseId) async {
+    await _client.from('subscriptions').update({
+      'last_paid_expense_id': expenseId,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', subscriptionId);
+  }
+
   Future<void> rescheduleAllReminders(String householdId) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
@@ -97,7 +104,9 @@ class SubscriptionRepository {
       await NotificationService.instance.scheduleSubscriptionReminder(
         subscriptionId: sub.id,
         title: sub.name,
-        body: 'Due ${sub.nextDueDate.toString().split(' ').first}',
+        body: sub.notes?.trim().isNotEmpty == true
+            ? sub.notes!.trim()
+            : 'Due ${sub.nextDueDate.toString().split(' ').first}',
         reminderAt: reminderAt,
       );
     } else {

@@ -72,10 +72,10 @@ final householdSettingsProvider = FutureProvider<HouseholdSettings?>((ref) async
 
 final enabledModulesProvider = Provider<Set<String>>((ref) {
   final settings = ref.watch(householdSettingsProvider).valueOrNull;
-  if (settings == null) {
-    return HouseholdModules.defaultEnabled.toSet();
-  }
-  return settings.enabledModules.toSet();
+  final raw = settings == null
+      ? HouseholdModules.defaultEnabled
+      : settings.enabledModules;
+  return HouseholdModules.sanitizeEnabled(raw);
 });
 
 final isModuleEnabledProvider = Provider.family<bool, String>((ref, module) {

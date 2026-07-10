@@ -2,8 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_providers.dart';
+import '../../../shared/constants/pantry_availability.dart';
 import '../../../shared/models/shopping_list_item.dart';
-import '../../auth/data/auth_repository.dart';
 
 class ShoppingRepository {
   ShoppingRepository(this._client);
@@ -15,7 +15,7 @@ class ShoppingRepository {
         .from('shopping_list_items')
         .select()
         .eq('household_id', householdId)
-        .order('is_checked')
+        .eq('is_checked', false)
         .order('created_at', ascending: false);
     return (data as List)
         .map((e) => ShoppingListItem.fromJson(e as Map<String, dynamic>))
@@ -69,27 +69,60 @@ class ShoppingRepository {
     return result;
   }
 
-  Future<int> generateFromRecipe(String recipeId) async {
-    final result = await _client.rpc<int>('generate_shopping_list_from_recipe',
-        params: {'p_recipe_id': recipeId});
-    return result;
+  Future<void> syncLowStockToShop(String householdId) async {
+    try {
+      await _client.rpc('sync_shopping_list_from_pantry', params: {
+        'p_household_id': householdId,
+      });
+    } catch (_) {
+      try {
+        await generateFromLowStock(householdId);
+      } catch (_) {
+        // Shop sync should not break pantry or other flows.
+      }
+    }
   }
 
-  Future<void> completeItem(String itemId, {bool restock = true}) async {
-    await _client.rpc('complete_shopping_item', params: {
-      'p_item_id': itemId,
-      'p_restock': restock,
-    });
+  Future<void> removeLowStockShopItemsForPantry({
+    required String householdId,
+    required String pantryItemId,
+    required String name,
+  }) async {
+    await _client
+        .from('shopping_list_items')
+        .delete()
+        .eq('household_id', householdId)
+        .eq('is_checked', false)
+        .eq('source', 'low_stock')
+        .or('pantry_item_id.eq.$pantryItemId,name.ilike.$name');
+  }
+
+  Future<void> completeItem(
+    String itemId, {
+    bool restock = true,
+    String? pantryItemId,
+  }) async {
+    try {
+      await _client.rpc('complete_shopping_item', params: {
+        'p_item_id': itemId,
+        'p_restock': restock,
+      });
+    } catch (_) {
+      // Fall through so local cleanup still runs if RPC is unavailable.
+    }
+
+    // Always remove from shop list (covers older DB functions that only checked).
+    await deleteItem(itemId);
+
+    if (pantryItemId != null) {
+      await _client
+          .from('pantry_items')
+          .update({'availability_status': PantryAvailability.fine})
+          .eq('id', pantryItemId);
+    }
   }
 }
 
 final shoppingRepositoryProvider = Provider<ShoppingRepository>((ref) {
   return ShoppingRepository(ref.watch(supabaseClientProvider));
-});
-
-final shoppingListProvider = FutureProvider<List<ShoppingListItem>>((ref) async {
-  final profile = await ref.watch(userProfileProvider.future);
-  final householdId = profile?.activeHouseholdId;
-  if (householdId == null) return [];
-  return ref.watch(shoppingRepositoryProvider).fetchItems(householdId);
 });

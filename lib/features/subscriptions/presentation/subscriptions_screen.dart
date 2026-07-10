@@ -5,8 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/constants/subscription_constants.dart';
 import '../../../shared/models/subscription.dart';
+import '../../../shared/providers/list_display_mode_provider.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/widgets/async_screen_body.dart';
+import '../../../shared/widgets/compact_grid_card.dart';
+import '../../../shared/widgets/list_grid_layout.dart';
+import '../../../shared/widgets/feature_screen_app_bar.dart';
+import '../../../shared/widgets/list_display_mode_toggle.dart';
 import '../data/subscription_repository.dart';
 
 class SubscriptionsScreen extends ConsumerWidget {
@@ -15,10 +20,19 @@ class SubscriptionsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final subsAsync = ref.watch(subscriptionsProvider);
+    final viewMode =
+        ref.watch(listDisplayModeProvider(ListDisplayModeKeys.subscriptions));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.subscriptionsTitle),
+      appBar: FeatureScreenAppBar.forShellRoute(
+        context,
+        title: AppStrings.subscriptionsTitle,
+        subtitle: AppStrings.subscriptionsSubtitle,
+        actions: const [
+          ListDisplayModeToggle(
+            screenKey: ListDisplayModeKeys.subscriptions,
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -38,18 +52,52 @@ class SubscriptionsScreen extends ConsumerWidget {
           builder: (subs) {
             final sorted = [...subs]
               ..sort((a, b) => a.daysUntilDue.compareTo(b.daysUntilDue));
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-              children: [
-                _SummaryHeader(subscriptions: subs),
-                const SizedBox(height: 20),
-                ...sorted.map(
-                  (sub) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _SubscriptionTile(
-                      subscription: sub,
-                      onTap: () =>
-                          context.push('/subscriptions/edit?id=${sub.id}'),
+            if (viewMode == ListDisplayMode.list) {
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                children: [
+                  _SummaryHeader(subscriptions: subs),
+                  const SizedBox(height: 20),
+                  ...sorted.map(
+                    (sub) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _SubscriptionTile(
+                        subscription: sub,
+                        onTap: () =>
+                            context.push('/subscriptions/edit?id=${sub.id}'),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+            return CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        _SummaryHeader(subscriptions: subs),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                  sliver: SliverGrid(
+                    gridDelegate: ListGridLayout.gridDelegate,
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final sub = sorted[index];
+                        return _SubscriptionGridCard(
+                          subscription: sub,
+                          onTap: () =>
+                              context.push('/subscriptions/edit?id=${sub.id}'),
+                        );
+                      },
+                      childCount: sorted.length,
                     ),
                   ),
                 ),
@@ -63,6 +111,45 @@ class SubscriptionsScreen extends ConsumerWidget {
         icon: const Icon(Icons.add),
         label: const Text(AppStrings.addSubscription),
       ),
+    );
+  }
+}
+
+class _SubscriptionGridCard extends StatelessWidget {
+  const _SubscriptionGridCard({
+    required this.subscription,
+    required this.onTap,
+  });
+
+  final Subscription subscription;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final days = subscription.daysUntilDue;
+    final dueLabel = days == 0
+        ? AppStrings.dueToday
+        : days == 1
+            ? AppStrings.dueTomorrow
+            : AppStrings.dueInDays(days);
+
+    return CompactGridCard(
+      onTap: onTap,
+      leading: CompactGridIcon(
+        icon: subscription.billingCycle == BillingCycles.monthly
+            ? Icons.repeat
+            : Icons.event_repeat_outlined,
+        color: theme.colorScheme.onSecondaryContainer,
+        backgroundColor: theme.colorScheme.secondaryContainer,
+      ),
+      title: subscription.name,
+      subtitle: [
+        if (subscription.amount != null)
+          Formatters.currency(subscription.amount!),
+        dueLabel,
+        if (subscription.paymentSummary != null) subscription.paymentSummary!,
+      ].join(' · '),
     );
   }
 }
@@ -225,6 +312,29 @@ class _SubscriptionTile extends StatelessWidget {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
+                    if (subscription.paymentSummary != null) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(
+                            PaymentMethods.iconFor(subscription.paymentMethod),
+                            size: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              subscription.paymentSummary!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 6),
                     Row(
                       children: [

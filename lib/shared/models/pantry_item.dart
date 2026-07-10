@@ -1,4 +1,6 @@
+import '../constants/pantry_availability.dart';
 import '../constants/pantry_constants.dart';
+import '../../core/strings/app_strings.dart';
 
 class PantryItem {
   const PantryItem({
@@ -9,6 +11,7 @@ class PantryItem {
     required this.unit,
     this.lowStockThreshold,
     this.lowStockUnit,
+    this.availabilityStatus,
     this.brand,
     this.category,
     this.expiryDate,
@@ -22,6 +25,7 @@ class PantryItem {
   final String unit;
   final double? lowStockThreshold;
   final String? lowStockUnit;
+  final String? availabilityStatus;
   final String? brand;
   final String? category;
   final DateTime? expiryDate;
@@ -33,7 +37,16 @@ class PantryItem {
   String? get brandLabel =>
       brand != null && brand!.trim().isNotEmpty ? brand!.trim() : null;
 
+  bool get hasManualAttention =>
+      availabilityStatus != null &&
+      PantryAvailability.attention.contains(availabilityStatus);
+
+  bool get isExplicitlyFine => availabilityStatus == PantryAvailability.fine;
+
+  bool get usesAutoStockTracking => availabilityStatus == null;
+
   bool get isLowStock {
+    if (!usesAutoStockTracking) return false;
     if (lowStockThreshold == null) return false;
     final quantityBase = quantity * PantryUnits.baseFactor(unit);
     final thresholdBase =
@@ -42,6 +55,18 @@ class PantryItem {
   }
 
   bool get isOutOfStock => quantity <= 0;
+
+  bool get needsAttention => isOutOfStock || isLowStock || hasManualAttention;
+
+  String get attentionLabel {
+    if (hasManualAttention) {
+      return PantryAvailability.label(availabilityStatus);
+    }
+    if (isOutOfStock) return AppStrings.outOfStock;
+    if (isLowStock) return AppStrings.lowStock;
+    if (isExplicitlyFine) return AppStrings.availabilityFine;
+    return AppStrings.availabilityAuto;
+  }
 
   bool get isExpiringSoon {
     if (expiryDate == null) return false;
@@ -63,6 +88,7 @@ class PantryItem {
           ? (json['low_stock_threshold'] as num).toDouble()
           : null,
       lowStockUnit: json['low_stock_unit'] as String?,
+      availabilityStatus: json['availability_status'] as String?,
       brand: json['brand'] as String?,
       category: json['category'] as String?,
       expiryDate: json['expiry_date'] != null
@@ -82,6 +108,7 @@ class PantryItem {
       'unit': unit,
       'low_stock_threshold': lowStockThreshold,
       'low_stock_unit': lowStockThreshold == null ? null : effectiveLowStockUnit,
+      'availability_status': availabilityStatus,
       'brand': brandLabel,
       'category': category,
       'expiry_date': expiryDate?.toIso8601String().split('T').first,
@@ -96,10 +123,33 @@ class PantryItem {
       'unit': unit,
       'low_stock_threshold': lowStockThreshold,
       'low_stock_unit': lowStockThreshold == null ? null : effectiveLowStockUnit,
+      'availability_status': availabilityStatus,
       'brand': brandLabel,
       'category': category,
       'expiry_date': expiryDate?.toIso8601String().split('T').first,
     };
+  }
+
+  PantryItem copyWith({
+    String? availabilityStatus,
+    bool clearAvailabilityStatus = false,
+    double? quantity,
+  }) {
+    return PantryItem(
+      id: id,
+      householdId: householdId,
+      name: name,
+      quantity: quantity ?? this.quantity,
+      unit: unit,
+      lowStockThreshold: lowStockThreshold,
+      lowStockUnit: lowStockUnit,
+      availabilityStatus:
+          clearAvailabilityStatus ? null : (availabilityStatus ?? this.availabilityStatus),
+      brand: brand,
+      category: category,
+      expiryDate: expiryDate,
+      updatedAt: updatedAt,
+    );
   }
 }
 

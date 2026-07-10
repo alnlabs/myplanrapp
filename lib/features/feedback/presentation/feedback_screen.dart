@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
+import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
@@ -59,7 +60,10 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text(AppStrings.feedbackTitle)),
+      appBar: const FeatureScreenAppBar(
+        title: AppStrings.feedbackTitle,
+        subtitle: AppStrings.feedbackSubtitle,
+      ),
       body: Form(
         key: _formKey,
         child: ListView(

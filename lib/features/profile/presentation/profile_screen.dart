@@ -86,8 +86,7 @@ class _BasicProfileScreenState extends ConsumerState<_BasicProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileProvider);
-    final email = ref.watch(supabaseClientProvider).auth.currentUser?.email ??
-        Supabase.instance.client.auth.currentUser?.email;
+    final email = ref.watch(supabaseClientProvider).auth.currentUser?.email;
 
     profileAsync.whenData((profile) => _loadName(profile?.displayName));
 

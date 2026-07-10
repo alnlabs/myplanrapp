@@ -47,26 +47,8 @@ class NavFeatures {
       selectedIcon: Icons.subscriptions,
     ),
     NavFeature(
-      module: HouseholdModules.reminders,
-      branchIndex: 5,
-      path: '/reminders',
-      label: AppStrings.navReminders,
-      hint: AppStrings.moreRemindersHint,
-      icon: Icons.notifications_outlined,
-      selectedIcon: Icons.notifications,
-    ),
-    NavFeature(
-      module: HouseholdModules.recipes,
-      branchIndex: 6,
-      path: '/recipes',
-      label: AppStrings.navRecipes,
-      hint: AppStrings.moreRecipesHint,
-      icon: Icons.menu_book_outlined,
-      selectedIcon: Icons.menu_book,
-    ),
-    NavFeature(
       module: HouseholdModules.shopping,
-      branchIndex: 7,
+      branchIndex: 5,
       path: '/shop',
       label: AppStrings.navShop,
       hint: AppStrings.moreShopHint,
@@ -76,11 +58,20 @@ class NavFeatures {
   ];
 
   static const homeBranchIndex = 0;
-  static const moreBranchIndex = 8;
+  static const moreBranchIndex = 6;
 
   /// Enabled features in priority order.
   static List<NavFeature> enabled(Set<String> modules) {
-    return ordered.where((f) => modules.contains(f.module)).toList();
+    return ordered.where((f) => _isNavFeatureEnabled(f.module, modules)).toList();
+  }
+
+  /// Plans tab covers reminders too — no separate reminders nav item.
+  static bool _isNavFeatureEnabled(String module, Set<String> modules) {
+    if (module == HouseholdModules.plans) {
+      return modules.contains(HouseholdModules.plans) ||
+          modules.contains(HouseholdModules.reminders);
+    }
+    return modules.contains(module);
   }
 
   /// Whether the More tab is needed (more than 3 feature modules enabled).

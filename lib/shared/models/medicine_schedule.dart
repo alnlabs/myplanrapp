@@ -3,7 +3,8 @@ class MedicineSchedule {
     required this.id,
     required this.familyMemberId,
     required this.householdId,
-    required this.medicineName,
+    required this.medicineFor,
+    this.medicineName,
     this.dosage,
     this.timesPerDay = const [],
     this.isActive = true,
@@ -14,7 +15,8 @@ class MedicineSchedule {
   final String id;
   final String familyMemberId;
   final String householdId;
-  final String medicineName;
+  final String medicineFor;
+  final String? medicineName;
   final String? dosage;
   final List<String> timesPerDay;
   final bool isActive;
@@ -24,13 +26,24 @@ class MedicineSchedule {
   String get timesLabel =>
       timesPerDay.isEmpty ? '' : timesPerDay.join(', ');
 
+  String get displayTitle {
+    final brand = medicineName?.trim();
+    if (brand != null && brand.isNotEmpty) {
+      return '$medicineFor · $brand';
+    }
+    return medicineFor;
+  }
+
   factory MedicineSchedule.fromJson(Map<String, dynamic> json) {
     final times = json['times_per_day'];
     return MedicineSchedule(
       id: json['id'] as String,
       familyMemberId: json['family_member_id'] as String,
       householdId: json['household_id'] as String,
-      medicineName: json['medicine_name'] as String,
+      medicineFor: json['medicine_for'] as String? ??
+          json['medicine_name'] as String? ??
+          '',
+      medicineName: json['medicine_name'] as String?,
       dosage: json['dosage'] as String?,
       timesPerDay: times is List
           ? times.map((e) => e.toString()).toList()
@@ -59,7 +72,8 @@ class MedicineSchedule {
     return {
       'family_member_id': familyMemberId,
       'household_id': householdId,
-      'medicine_name': medicineName,
+      'medicine_for': medicineFor,
+      'medicine_name': _nullableTrim(medicineName),
       'dosage': dosage,
       'times_per_day': timesPerDay,
       'is_active': isActive,
@@ -68,10 +82,17 @@ class MedicineSchedule {
 
   Map<String, dynamic> toUpdateJson() {
     return {
-      'medicine_name': medicineName,
+      'medicine_for': medicineFor,
+      'medicine_name': _nullableTrim(medicineName),
       'dosage': dosage,
       'times_per_day': timesPerDay,
       'is_active': isActive,
     };
+  }
+
+  static String? _nullableTrim(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return trimmed;
   }
 }

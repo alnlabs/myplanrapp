@@ -21,7 +21,7 @@ class ApiErrorFormatter {
       return AppStrings.errorNetwork;
     }
     if (error is TimeoutException) {
-      return 'Request timed out. Please try again.';
+      return AppStrings.errorTimeout;
     }
     // Supabase/HTTP wrap connectivity failures in their own exception types
     // (AuthRetryableFetchException, ClientException) rather than SocketException.

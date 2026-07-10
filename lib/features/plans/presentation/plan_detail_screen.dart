@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/supabase_providers.dart';
 import '../../../core/strings/app_strings.dart';
+import '../../../shared/constants/meal_slots.dart';
 import '../../../shared/constants/plan_constants.dart';
 import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/utils/formatters.dart';
@@ -10,6 +11,7 @@ import '../../../shared/widgets/async_screen_body.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../shopping/data/shopping_repository.dart';
 import '../data/plan_repository.dart';
+import '../data/plans_list_provider.dart';
 import 'plan_form_screen.dart';
 
 class PlanDetailScreen extends ConsumerWidget {
@@ -44,8 +46,7 @@ class PlanDetailScreen extends ConsumerWidget {
                     ),
                   );
                   ref.invalidate(planProvider(planId));
-                  ref.invalidate(plansProvider);
-                  ref.invalidate(openPlansProvider);
+                  await refreshPlansData(ref);
                 },
               );
             },
@@ -75,6 +76,8 @@ class PlanDetailScreen extends ConsumerWidget {
                 spacing: 8,
                 children: [
                   Chip(label: Text(PlanTypes.labelFor(plan.planType))),
+                  if (plan.planType == PlanTypes.meal && plan.mealSlot != null)
+                    Chip(label: Text(MealSlots.labelFor(plan.mealSlot!))),
                   Chip(
                     label: Text(
                       plan.isPersonal
@@ -107,9 +110,8 @@ class PlanDetailScreen extends ConsumerWidget {
                   onPressed: () async {
                     try {
                       await ref.read(planRepositoryProvider).completePlan(plan.id);
-                      ref.invalidate(plansProvider);
-                      ref.invalidate(openPlansProvider);
                       ref.invalidate(planProvider(planId));
+                      await refreshPlansData(ref);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text(AppStrings.planCompleted)),

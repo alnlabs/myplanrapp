@@ -7,6 +7,8 @@ import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
 import '../data/pantry_repository.dart';
+import '../data/pantry_shop_refresh.dart';
+import '../../../shared/utils/app_bottom_sheet.dart';
 
 /// Shared bottom sheet for logging pantry usage / restock.
 /// The pantry list itself lives in [InventoryScreen] (features/inventory).
@@ -20,8 +22,9 @@ void showStockSheet(
   final noteController = TextEditingController();
   final formKey = GlobalKey<FormState>();
   var loading = false;
+  var clearAvailability = isRestock && item.availabilityStatus != null;
 
-  showModalBottomSheet<void>(
+  showAppBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -58,6 +61,16 @@ void showStockSheet(
                     label: AppStrings.note,
                     maxLines: 2,
                   ),
+                  if (isRestock && item.availabilityStatus != null) ...[
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(AppStrings.clearAvailabilityOnRestock),
+                      value: clearAvailability,
+                      onChanged: (value) =>
+                          setSheetState(() => clearAvailability = value),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   LoadingButton(
                     label: AppStrings.save,
@@ -75,8 +88,12 @@ void showStockSheet(
                                   ? null
                                   : noteController.text.trim(),
                             );
-                        ref.invalidate(pantryItemsProvider);
-                        ref.invalidate(lowStockItemsProvider);
+                        if (isRestock && clearAvailability) {
+                          await ref
+                              .read(pantryRepositoryProvider)
+                              .updateAvailabilityStatus(item.id, null);
+                        }
+                        await refreshPantryAfterStockChange(ref);
                         ref.invalidate(stockEventsProvider(item.id));
                         if (context.mounted) {
                           Navigator.pop(context);
@@ -94,5 +111,35 @@ void showStockSheet(
         },
       );
     },
+  );
+}
+
+void showSuccessSnackBar(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message)),
+  );
+}
+
+Future<bool?> showConfirmDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+}) {
+  return showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text(AppStrings.cancel),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text(AppStrings.delete),
+        ),
+      ],
+    ),
   );
 }

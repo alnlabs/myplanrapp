@@ -2,7 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../core/strings/app_strings.dart';
 
-enum StatusChipType { sufficient, insufficient, missing, lowStock, outOfStock }
+enum StatusChipType {
+  sufficient,
+  insufficient,
+  missing,
+  lowStock,
+  outOfStock,
+  availabilityWarning,
+  availabilityRequired,
+  availabilityEmergency,
+}
 
 class StatusChip extends StatelessWidget {
   const StatusChip({super.key, required this.type});
@@ -37,6 +46,21 @@ class StatusChip extends StatelessWidget {
           Colors.red.shade800,
           Colors.red.shade50,
         ),
+      StatusChipType.availabilityWarning => (
+          AppStrings.availabilityWarning,
+          Colors.amber.shade900,
+          Colors.amber.shade50,
+        ),
+      StatusChipType.availabilityRequired => (
+          AppStrings.availabilityRequired,
+          Colors.deepOrange.shade800,
+          Colors.deepOrange.shade50,
+        ),
+      StatusChipType.availabilityEmergency => (
+          AppStrings.availabilityEmergency,
+          Colors.red.shade800,
+          Colors.red.shade50,
+        ),
     };
 
     return Container(
@@ -51,5 +75,15 @@ class StatusChip extends StatelessWidget {
         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
       ),
     );
+  }
+
+  static StatusChipType? forAvailability(String? status) {
+    return switch (status) {
+      'fine' => StatusChipType.sufficient,
+      'warning' => StatusChipType.availabilityWarning,
+      'required' => StatusChipType.availabilityRequired,
+      'emergency' => StatusChipType.availabilityEmergency,
+      _ => null,
+    };
   }
 }

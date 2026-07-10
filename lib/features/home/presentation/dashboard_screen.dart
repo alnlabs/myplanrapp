@@ -4,11 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/strings/app_strings.dart';
+import '../utils/dashboard_greeting.dart';
 import '../../../shared/constants/household_modules.dart';
+import '../../../shared/constants/meal_slots.dart';
 import '../../../shared/constants/plan_constants.dart';
 import '../../../shared/models/home_asset.dart';
 import '../../../shared/models/household.dart';
 import '../../../shared/models/pantry_item.dart';
+import '../../../shared/models/plan.dart';
 import '../../../shared/models/subscription.dart';
 import '../../../shared/models/user_profile.dart';
 import '../../../shared/utils/formatters.dart';
@@ -19,49 +22,34 @@ import '../../expenses/data/expense_repository.dart';
 import '../../expenses/presentation/add_expense_screen.dart';
 import '../../household/data/household_repository.dart';
 import '../../household/data/household_settings_repository.dart';
+import '../../household/data/medicine_dose_tracker.dart';
 import '../../household/data/medicine_schedule_repository.dart';
 import '../../household/presentation/household_screen.dart';
 import '../../pantry/data/pantry_repository.dart';
 import '../../plans/data/plan_repository.dart';
+import '../../plans/presentation/plan_detail_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
-import '../../recipes/presentation/recipe_form_screen.dart';
 import '../../subscriptions/data/subscription_repository.dart';
+import '../../settings/data/device_permissions.dart';
+import '../../settings/presentation/device_permissions_screen.dart';
 import '../data/setup_checklist_provider.dart';
+import '../utils/dashboard_attention_groups.dart';
 import 'setup_checklist_card.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
-
-  static String _greeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return AppStrings.goodMorning;
-    if (hour < 17) return AppStrings.goodAfternoon;
-    return AppStrings.goodEvening;
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
     final householdAsync = ref.watch(activeHouseholdProvider);
     final modules = ref.watch(enabledModulesProvider);
-    final lowStockAsync = ref.watch(lowStockItemsProvider);
-    final expiringAsync = ref.watch(expiringItemsProvider);
-    final summaryAsync = ref.watch(expenseSummaryProvider);
-    final openPlansAsync = ref.watch(openPlansProvider);
-    final warrantyAsync = ref.watch(warrantyExpiringAssetsProvider);
-    final subsDueSoonAsync = ref.watch(subscriptionsDueSoonProvider);
-    final medicineTodayAsync = ref.watch(medicineRemindersTodayProvider);
-    final checklistAsync = ref.watch(setupChecklistProvider);
 
     final showExpenses = modules.contains(HouseholdModules.expenses);
     final showPlans = modules.contains(HouseholdModules.plans);
     final showAssets = modules.contains(HouseholdModules.assets);
     final showPantry = modules.contains(HouseholdModules.pantry);
-    final showRecipes = modules.contains(HouseholdModules.recipes);
     final showSubscriptions = modules.contains(HouseholdModules.subscriptions);
-
-    final showTodaySection =
-        showPlans || (medicineTodayAsync.valueOrNull?.isNotEmpty ?? false);
 
     return Scaffold(
       body: RefreshIndicator(
@@ -75,7 +63,7 @@ class DashboardScreen extends ConsumerWidget {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   child: _DashboardHeader(
-                    greeting: _greeting(),
+                    greeting: dashboardGreeting(),
                     profileAsync: profileAsync,
                     householdAsync: householdAsync,
                     onProfile: () => Navigator.of(context).push(
@@ -90,68 +78,37 @@ class DashboardScreen extends ConsumerWidget {
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              sliver: const SliverToBoxAdapter(
+                child: _DashboardDeviceBlockersBanner(),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               sliver: SliverToBoxAdapter(
                 child: _QuickActionsGrid(
                   showPlans: showPlans,
                   showPantry: showPantry,
                   showExpenses: showExpenses,
-                  showRecipes: showRecipes,
                   showSubscriptions: showSubscriptions,
                   onAddPlan: () => context.push('/plans/add'),
+                  onAddMeal: () => context.push('/plans/add?type=meal&slot=lunch'),
                   onAddItem: () => context.push('/pantry/add'),
                   onAddExpense: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(builder: (_) => const AddExpenseScreen()),
-                  ),
-                  onAddRecipe: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const RecipeFormScreen()),
                   ),
                   onAddSubscription: () => context.push('/subscriptions/add'),
                   onShop: () => context.go('/shop'),
                 ),
               ),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverToBoxAdapter(
-                child: checklistAsync.when(
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
-                  data: (checklist) {
-                    if (checklist == null) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: SetupChecklistCard(checklist: checklist),
-                    );
-                  },
-                ),
-              ),
+            const SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverToBoxAdapter(child: _DashboardSetupChecklist()),
             ),
             if (showExpenses)
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverToBoxAdapter(
-                  child: summaryAsync.when(
-                    loading: () => const Padding(
-                      padding: EdgeInsets.only(bottom: 16),
-                      child: LinearProgressIndicator(),
-                    ),
-                    error: (_, __) => const SizedBox.shrink(),
-                    data: (rows) {
-                      final total =
-                          rows.fold<double>(0, (s, r) => s + r.totalAmount);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _SummaryCard(
-                          label: AppStrings.monthlyTotal,
-                          value: Formatters.currency(total),
-                          subtitle: Formatters.monthYear(DateTime.now()),
-                          icon: Icons.payments_outlined,
-                          onTap: () => context.go('/expenses'),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+              const SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(child: _DashboardExpensesSummary()),
               ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -160,106 +117,16 @@ class DashboardScreen extends ConsumerWidget {
                   showPantry: showPantry,
                   showAssets: showAssets,
                   showSubscriptions: showSubscriptions,
-                  lowStockAsync: lowStockAsync,
-                  expiringAsync: expiringAsync,
-                  warrantyAsync: warrantyAsync,
-                  subsDueSoonAsync: subsDueSoonAsync,
                   onAlerts: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(builder: (_) => const AlertsScreen()),
                   ),
                   onPantry: () => context.go('/pantry'),
+                  onAssets: () => context.go('/pantry?segment=assets'),
                   onSubscriptions: () => context.go('/subscriptions'),
                 ),
               ),
             ),
-            if (showTodaySection) ...[
-            const SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-              sliver: SliverToBoxAdapter(
-                child: _SectionTitle(title: AppStrings.todayOverview),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverToBoxAdapter(
-                child: medicineTodayAsync.when(
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
-                  data: (reminders) {
-                    if (reminders.isEmpty) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _TodayCard(
-                        icon: Icons.medication_outlined,
-                        title: AppStrings.medicineToday,
-                        subtitle:
-                            '${reminders.length} dose${reminders.length == 1 ? '' : 's'} today',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const HouseholdScreen(),
-                          ),
-                        ),
-                        moreCount: reminders.length > 3 ? reminders.length - 3 : 0,
-                        children: reminders.take(3).map((item) {
-                          return _TodayRow(
-                            title: item.medicineName,
-                            subtitle: [
-                              item.timeLabel,
-                              item.memberName,
-                              if (item.dosage != null) item.dosage!,
-                            ].join(' · '),
-                          );
-                        }).toList(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            if (showPlans)
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverToBoxAdapter(
-                  child: openPlansAsync.when(
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
-                    data: (plans) {
-                      final sorted = [...plans]
-                        ..sort((a, b) {
-                          if (a.dueAt == null && b.dueAt == null) return 0;
-                          if (a.dueAt == null) return 1;
-                          if (b.dueAt == null) return -1;
-                          return a.dueAt!.compareTo(b.dueAt!);
-                        });
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 24),
-                        child: _TodayCard(
-                          icon: Icons.event_note_outlined,
-                          title: AppStrings.openPlans,
-                          subtitle: plans.isEmpty
-                              ? AppStrings.noOpenPlans
-                              : '${plans.length} open',
-                          onTap: () => context.go('/plans'),
-                          moreCount: plans.length > 3 ? plans.length - 3 : 0,
-                          emptyText: AppStrings.noOpenPlans,
-                          children: sorted.take(3).map((plan) {
-                            return _TodayRow(
-                              title: plan.title,
-                              subtitle: [
-                                PlanTypes.labelFor(plan.planType),
-                                if (plan.dueAt != null)
-                                  Formatters.dateTime(plan.dueAt!),
-                              ].join(' · '),
-                              icon: _planIcon(plan.planType),
-                            );
-                          }).toList(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
+            const SliverToBoxAdapter(child: _DashboardTodayOverview()),
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
           ],
         ),
@@ -268,16 +135,37 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   Future<void> _refresh(WidgetRef ref) async {
+    final modules = ref.read(enabledModulesProvider);
+
     ref.invalidate(activeHouseholdProvider);
     ref.invalidate(userProfileProvider);
-    ref.invalidate(lowStockItemsProvider);
-    ref.invalidate(expiringItemsProvider);
-    ref.invalidate(expenseSummaryProvider);
-    ref.invalidate(openPlansProvider);
-    ref.invalidate(warrantyExpiringAssetsProvider);
-    ref.invalidate(subscriptionsDueSoonProvider);
-    ref.invalidate(medicineRemindersTodayProvider);
+    if (modules.contains(HouseholdModules.pantry)) {
+      ref.invalidate(lowStockItemsProvider);
+      ref.invalidate(expiringItemsProvider);
+    }
+    if (modules.contains(HouseholdModules.expenses)) {
+      ref.invalidate(expenseSummaryProvider);
+    }
+    if (modules.contains(HouseholdModules.plans)) {
+      ref.invalidate(openPlansOverviewProvider);
+      ref.invalidate(todayMealPlansProvider);
+    }
+    if (modules.contains(HouseholdModules.assets)) {
+      ref.invalidate(warrantyExpiringAssetsProvider);
+    }
+    if (modules.contains(HouseholdModules.subscriptions)) {
+      ref.invalidate(subscriptionsDueSoonProvider);
+    }
+    if (modules.contains(HouseholdModules.memberDetails)) {
+      ref.invalidate(medicineRemindersTodayProvider);
+      ref.invalidate(medicineDosesTakenTodayProvider);
+    }
+    ref.invalidate(setupChecklistDismissedProvider);
     ref.invalidate(setupChecklistProvider);
+    if (modules.contains(HouseholdModules.reminders) ||
+        modules.contains(HouseholdModules.plans)) {
+      ref.invalidate(deviceReminderBlockersProvider);
+    }
   }
 
   static IconData _planIcon(String type) => switch (type) {
@@ -422,12 +310,11 @@ class _QuickActionsGrid extends StatelessWidget {
     required this.showPlans,
     required this.showPantry,
     required this.showExpenses,
-    required this.showRecipes,
     required this.showSubscriptions,
     required this.onAddPlan,
+    required this.onAddMeal,
     required this.onAddItem,
     required this.onAddExpense,
-    required this.onAddRecipe,
     required this.onAddSubscription,
     required this.onShop,
   });
@@ -435,12 +322,11 @@ class _QuickActionsGrid extends StatelessWidget {
   final bool showPlans;
   final bool showPantry;
   final bool showExpenses;
-  final bool showRecipes;
   final bool showSubscriptions;
   final VoidCallback onAddPlan;
+  final VoidCallback onAddMeal;
   final VoidCallback onAddItem;
   final VoidCallback onAddExpense;
-  final VoidCallback onAddRecipe;
   final VoidCallback onAddSubscription;
   final VoidCallback onShop;
 
@@ -448,10 +334,10 @@ class _QuickActionsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = <({IconData icon, String label, VoidCallback onTap})>[
       if (showPlans) (icon: Icons.event_note_outlined, label: AppStrings.quickActionPlan, onTap: onAddPlan),
+      if (showPlans) (icon: Icons.restaurant_outlined, label: AppStrings.quickActionMeal, onTap: onAddMeal),
       if (showPantry) (icon: Icons.kitchen_outlined, label: AppStrings.quickActionPantry, onTap: onAddItem),
       if (showPantry) (icon: Icons.shopping_cart_outlined, label: AppStrings.quickActionShop, onTap: onShop),
       if (showExpenses) (icon: Icons.payments_outlined, label: AppStrings.quickActionExpense, onTap: onAddExpense),
-      if (showRecipes) (icon: Icons.menu_book_outlined, label: AppStrings.quickActionRecipe, onTap: onAddRecipe),
       if (showSubscriptions) (icon: Icons.subscriptions_outlined, label: AppStrings.quickActionSubscription, onTap: onAddSubscription),
     ];
 
@@ -605,117 +491,146 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _AttentionSection extends StatelessWidget {
+class _AttentionSection extends ConsumerWidget {
   const _AttentionSection({
     required this.showPantry,
     required this.showAssets,
     required this.showSubscriptions,
-    required this.lowStockAsync,
-    required this.expiringAsync,
-    required this.warrantyAsync,
-    required this.subsDueSoonAsync,
     required this.onAlerts,
     required this.onPantry,
+    required this.onAssets,
     required this.onSubscriptions,
   });
 
   final bool showPantry;
   final bool showAssets;
   final bool showSubscriptions;
-  final AsyncValue<List<PantryItem>> lowStockAsync;
-  final AsyncValue<List<PantryItem>> expiringAsync;
-  final AsyncValue<List<HomeAsset>> warrantyAsync;
-  final AsyncValue<List<Subscription>> subsDueSoonAsync;
   final VoidCallback onAlerts;
   final VoidCallback onPantry;
+  final VoidCallback onAssets;
   final VoidCallback onSubscriptions;
 
+  List<_AttentionGroup> _buildGroups(
+    BuildContext context, {
+    required List<PantryItem> lowStock,
+    required List<PantryItem> expiring,
+    required List<HomeAsset> warranty,
+    required List<Subscription> subs,
+  }) {
+    final data = buildDashboardAttentionGroups(
+      showPantry: showPantry,
+      showAssets: showAssets,
+      showSubscriptions: showSubscriptions,
+      lowStock: lowStock,
+      expiring: expiring,
+      warranty: warranty,
+      subs: subs,
+    );
+
+    Color colorForKind(String kind) => switch (kind) {
+          'low_stock' => Colors.amber.shade800,
+          'expiring' => Colors.deepOrange.shade700,
+          'warranty' => Colors.amber.shade800,
+          'subscriptions' => Theme.of(context).colorScheme.error,
+          _ => Theme.of(context).colorScheme.primary,
+        };
+
+    IconData iconForKind(String kind) => switch (kind) {
+          'low_stock' => Icons.inventory_2_outlined,
+          'expiring' => Icons.event_busy_outlined,
+          'warranty' => Icons.verified_outlined,
+          'subscriptions' => Icons.subscriptions_outlined,
+          _ => Icons.info_outline,
+        };
+
+    VoidCallback onTapForKind(String kind) => switch (kind) {
+          'low_stock' => onAlerts,
+          'expiring' => onPantry,
+          'warranty' => onAssets,
+          'subscriptions' => onSubscriptions,
+          _ => onAlerts,
+        };
+
+    return data
+        .map(
+          (group) => _AttentionGroup(
+            icon: iconForKind(group.kind),
+            color: colorForKind(group.kind),
+            title: group.title,
+            previews: group.previews,
+            totalCount: group.totalCount,
+            onTap: onTapForKind(group.kind),
+          ),
+        )
+        .toList();
+  }
+
   @override
-  Widget build(BuildContext context) {
-    final items = <_AttentionItem>[];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final lowStock = showPantry
+        ? ref.watch(lowStockItemsProvider).valueOrNull ?? const <PantryItem>[]
+        : const <PantryItem>[];
+    final expiring = showPantry
+        ? ref.watch(expiringItemsProvider).valueOrNull ?? const <PantryItem>[]
+        : const <PantryItem>[];
+    final warranty = showAssets
+        ? ref.watch(warrantyExpiringAssetsProvider).valueOrNull ??
+            const <HomeAsset>[]
+        : const <HomeAsset>[];
+    final subs = showSubscriptions
+        ? ref.watch(subscriptionsDueSoonProvider).valueOrNull ??
+            const <Subscription>[]
+        : const <Subscription>[];
 
-    if (showPantry) {
-      final lowStock = lowStockAsync.valueOrNull ?? [];
-      if (lowStock.isNotEmpty) {
-        items.add(_AttentionItem(
-          icon: Icons.warning_amber_rounded,
-          color: Colors.amber.shade800,
-          title: AppStrings.alertsTitle,
-          subtitle: '${lowStock.length} low stock item${lowStock.length == 1 ? '' : 's'}',
-          onTap: onAlerts,
-        ));
-      }
-      final expiring = expiringAsync.valueOrNull ?? [];
-      if (expiring.isNotEmpty) {
-        items.add(_AttentionItem(
-          icon: Icons.event_busy_outlined,
-          color: Colors.orange.shade800,
-          title: AppStrings.expiringSoon,
-          subtitle: '${expiring.length} item${expiring.length == 1 ? '' : 's'} expiring',
-          onTap: onPantry,
-        ));
-      }
-    }
-
-    if (showAssets) {
-      final warranty = warrantyAsync.valueOrNull ?? [];
-      if (warranty.isNotEmpty) {
-        items.add(_AttentionItem(
-          icon: Icons.verified_outlined,
-          color: Colors.amber.shade800,
-          title: AppStrings.warrantyExpiringTitle,
-          subtitle:
-              '${warranty.length} ${warranty.length == 1 ? 'warranty' : 'warranties'} expiring',
-          onTap: onPantry,
-        ));
-      }
-    }
-
-    if (showSubscriptions) {
-      final subs = subsDueSoonAsync.valueOrNull ?? [];
-      if (subs.isNotEmpty) {
-        items.add(_AttentionItem(
-          icon: Icons.subscriptions_outlined,
-          color: Theme.of(context).colorScheme.error,
-          title: AppStrings.subscriptionsDueSoon,
-          subtitle: subs.map((s) => s.name).take(2).join(', ') +
-              (subs.length > 2 ? '…' : ''),
-          onTap: onSubscriptions,
-        ));
-      }
-    }
+    final groups = _buildGroups(
+      context,
+      lowStock: lowStock,
+      expiring: expiring,
+      warranty: warranty,
+      subs: subs,
+    );
+    final totalCount =
+        groups.fold<int>(0, (sum, group) => sum + group.totalCount);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionTitle(title: AppStrings.needsAttention),
-        const SizedBox(height: 8),
-        if (items.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      AppStrings.allClear,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
+        Row(
+          children: [
+            const Expanded(
+              child: _SectionTitle(title: AppStrings.needsAttention),
             ),
-          )
+            if (totalCount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.error.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$totalCount',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (groups.isEmpty)
+          const _AttentionEmptyState()
         else
-          ...items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _AttentionTile(item: item),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (var i = 0; i < groups.length; i++) ...[
+                  if (i > 0) const Divider(height: 1),
+                  _AttentionGroupTile(group: groups[i]),
+                ],
+              ],
             ),
           ),
         const SizedBox(height: 8),
@@ -724,55 +639,178 @@ class _AttentionSection extends StatelessWidget {
   }
 }
 
-class _AttentionItem {
-  const _AttentionItem({
+class _AttentionGroup {
+  const _AttentionGroup({
     required this.icon,
     required this.color,
     required this.title,
-    required this.subtitle,
+    required this.previews,
+    required this.totalCount,
     required this.onTap,
   });
 
   final IconData icon;
   final Color color;
   final String title;
-  final String subtitle;
+  final List<String> previews;
+  final int totalCount;
   final VoidCallback onTap;
 }
 
-class _AttentionTile extends StatelessWidget {
-  const _AttentionTile({required this.item});
+class _AttentionGroupTile extends StatelessWidget {
+  const _AttentionGroupTile({required this.group});
 
-  final _AttentionItem item;
+  final _AttentionGroup group;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
+    final theme = Theme.of(context);
+    final moreCount = group.totalCount - group.previews.length;
+
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        onTap: item.onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: IntrinsicHeight(
+        onTap: group.onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 4,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: item.color,
-                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+                  color: group.color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(group.icon, color: group.color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            group.title,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: group.color.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${group.totalCount}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: group.color,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ...group.previews.map(
+                      (line) => Padding(
+                        padding: const EdgeInsets.only(bottom: 3),
+                        child: Text(
+                          line,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (moreCount > 0)
+                      Text(
+                        AppStrings.attentionMore(moreCount),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              Expanded(
-                child: ListTile(
-                  leading: Icon(item.icon, color: item.color),
-                  title: Text(item.title),
-                  subtitle: Text(item.subtitle),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AttentionEmptyState extends StatelessWidget {
+  const _AttentionEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.primary.withOpacity(0.12),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.check_circle_outline,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppStrings.attentionAllSetTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  AppStrings.attentionAllSetSubtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -848,6 +886,215 @@ class _TodayCard extends StatelessWidget {
   }
 }
 
+class _MedicineTodayCard extends ConsumerWidget {
+  const _MedicineTodayCard({
+    required this.reminders,
+    required this.takenKeys,
+    required this.pendingCount,
+    required this.takenCount,
+  });
+
+  final List<MedicineReminderToday> reminders;
+  final Set<String> takenKeys;
+  final int pendingCount;
+  final int takenCount;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final subtitle = takenCount == 0
+        ? '${reminders.length} dose${reminders.length == 1 ? '' : 's'} today'
+        : '$pendingCount left · $takenCount taken';
+
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: Icon(Icons.medication_outlined, color: theme.colorScheme.primary),
+            title: Text(AppStrings.medicineToday, style: theme.textTheme.titleSmall),
+            subtitle: Text(subtitle),
+            trailing: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const HouseholdScreen(),
+                ),
+              ),
+              child: const Text(AppStrings.viewAll),
+            ),
+          ),
+          const Divider(height: 1),
+          ...reminders.take(5).map((item) {
+            final doseKey =
+                MedicineDoseTracker.doseKey(item.scheduleId, item.timeIndex);
+            final taken = takenKeys.contains(doseKey);
+            final subtitleText = [
+              item.timeLabel,
+              item.memberName,
+              if (item.dosage != null) item.dosage!,
+            ].join(' · ');
+
+            return CheckboxListTile(
+              dense: true,
+              value: taken,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: Text(
+                item.displayTitle,
+                style: taken
+                    ? theme.textTheme.bodyMedium?.copyWith(
+                        decoration: TextDecoration.lineThrough,
+                        color: theme.colorScheme.outline,
+                      )
+                    : null,
+              ),
+              subtitle: Text(subtitleText),
+              onChanged: (checked) async {
+                await markMedicineDoseTaken(
+                  ref,
+                  scheduleId: item.scheduleId,
+                  timeIndex: item.timeIndex,
+                  taken: checked ?? false,
+                );
+              },
+            );
+          }),
+          if (reminders.length > 5)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '+ ${reminders.length - 5} more',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TodayEatPlanCard extends StatelessWidget {
+  const _TodayEatPlanCard({required this.meals});
+
+  final List<Plan> meals;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final grouped = groupTodayMealsBySlot(meals);
+    final unassigned = unassignedTodayMeals(meals);
+    final plannedCount = MealSlots.primary
+        .where((slot) => (grouped[slot]?.isNotEmpty ?? false))
+        .length;
+
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: Icon(Icons.restaurant_outlined, color: theme.colorScheme.primary),
+            title: Text(AppStrings.todayEatPlan, style: theme.textTheme.titleSmall),
+            subtitle: Text(
+              plannedCount == 0
+                  ? AppStrings.mealNotPlanned
+                  : '$plannedCount of ${MealSlots.primary.length} planned',
+            ),
+            trailing: TextButton(
+              onPressed: () => context.go('/plans'),
+              child: const Text(AppStrings.viewAll),
+            ),
+          ),
+          const Divider(height: 1),
+          ...MealSlots.primary.map((slot) {
+            final slotMeals = grouped[slot] ?? const <Plan>[];
+            final plan = slotMeals.isNotEmpty ? slotMeals.first : null;
+            final extraCount = slotMeals.length > 1 ? slotMeals.length - 1 : 0;
+            final slotLabel = MealSlots.labelFor(slot);
+
+            return ListTile(
+              dense: true,
+              leading: Icon(
+                _mealSlotIcon(slot),
+                size: 20,
+                color: plan != null
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outline,
+              ),
+              title: Text(slotLabel),
+              subtitle: Text(
+                plan != null
+                    ? [
+                        plan.title,
+                        if (extraCount > 0) AppStrings.attentionMore(extraCount),
+                      ].join(' · ')
+                    : AppStrings.mealNotPlanned,
+              ),
+              trailing: Icon(
+                plan != null ? Icons.chevron_right : Icons.add,
+                size: 20,
+                color: theme.colorScheme.outline,
+              ),
+              onTap: () {
+                if (plan != null) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => PlanDetailScreen(planId: plan.id),
+                    ),
+                  );
+                } else {
+                  context.push('/plans/add?type=meal&slot=$slot');
+                }
+              },
+            );
+          }),
+          if (unassigned.isNotEmpty) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppStrings.mealUnassigned,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ...unassigned.take(2).map(
+                        (plan) => Text(
+                          plan.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                  if (unassigned.length > 2)
+                    Text(
+                      AppStrings.attentionMore(unassigned.length - 2),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static IconData _mealSlotIcon(String slot) => switch (slot) {
+        MealSlots.breakfast => Icons.free_breakfast_outlined,
+        MealSlots.lunch => Icons.lunch_dining_outlined,
+        MealSlots.dinner => Icons.dinner_dining_outlined,
+        _ => Icons.restaurant_outlined,
+      };
+}
+
 class _TodayRow extends StatelessWidget {
   const _TodayRow({
     required this.title,
@@ -872,6 +1119,80 @@ class _TodayRow extends StatelessWidget {
   }
 }
 
+class _DeviceAlertsBanner extends ConsumerWidget {
+  const _DeviceAlertsBanner({required this.blockers});
+
+  final List<AppPermissionInfo> blockers;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final needsNotifications = blockers.any(
+      (b) => b.kind == AppPermissionKind.notifications,
+    );
+    final needsExactAlarms = blockers.any(
+      (b) => b.kind == AppPermissionKind.exactAlarms,
+    );
+
+    final hints = <String>[
+      if (needsNotifications) AppStrings.deviceAlertsNotificationsHint,
+      if (needsExactAlarms) AppStrings.deviceAlertsExactAlarmHint,
+    ];
+
+    return Card(
+      color: theme.colorScheme.errorContainer.withOpacity(0.35),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.notifications_off_outlined,
+              color: theme.colorScheme.error,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppStrings.deviceAlertsDisabled,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.error,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ...hints.map(
+                    (hint) => Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        hint,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const DevicePermissionsScreen(),
+                  ),
+                );
+                ref.invalidate(deviceReminderBlockersProvider);
+              },
+              child: const Text(AppStrings.deviceAlertsFix),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title});
 
@@ -884,6 +1205,225 @@ class _SectionTitle extends StatelessWidget {
       style: Theme.of(context).textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w700,
           ),
+    );
+  }
+}
+
+class _DashboardDeviceBlockersBanner extends ConsumerWidget {
+  const _DashboardDeviceBlockersBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final modules = ref.watch(enabledModulesProvider);
+    final show = modules.contains(HouseholdModules.reminders) ||
+        modules.contains(HouseholdModules.plans);
+    if (!show) return const SizedBox.shrink();
+
+    final blockersAsync = ref.watch(deviceReminderBlockersProvider);
+    return blockersAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (blockers) {
+        if (blockers.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _DeviceAlertsBanner(blockers: blockers),
+        );
+      },
+    );
+  }
+}
+
+class _DashboardSetupChecklist extends ConsumerWidget {
+  const _DashboardSetupChecklist();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dismissedAsync = ref.watch(setupChecklistDismissedProvider);
+    return dismissedAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (dismissed) {
+        if (dismissed) return const SizedBox.shrink();
+        return const _DashboardSetupChecklistLoaded();
+      },
+    );
+  }
+}
+
+class _DashboardSetupChecklistLoaded extends ConsumerWidget {
+  const _DashboardSetupChecklistLoaded();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final checklistAsync = ref.watch(setupChecklistProvider);
+    return checklistAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (checklist) {
+        if (checklist == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: SetupChecklistCard(checklist: checklist),
+        );
+      },
+    );
+  }
+}
+
+class _DashboardExpensesSummary extends ConsumerWidget {
+  const _DashboardExpensesSummary();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(expenseSummaryProvider);
+    return summaryAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.only(bottom: 16),
+        child: LinearProgressIndicator(),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (rows) {
+        final total = rows.fold<double>(0.0, (s, r) => s + r.totalAmount);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _SummaryCard(
+            label: AppStrings.monthlyTotal,
+            value: Formatters.currency(total),
+            subtitle: Formatters.monthYear(DateTime.now()),
+            icon: Icons.payments_outlined,
+            onTap: () => context.go('/expenses'),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DashboardTodayOverview extends ConsumerWidget {
+  const _DashboardTodayOverview();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final modules = ref.watch(enabledModulesProvider);
+    final showPlans = modules.contains(HouseholdModules.plans);
+    final showMedicine = modules.contains(HouseholdModules.memberDetails);
+    if (!showPlans && !showMedicine) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: _SectionTitle(title: AppStrings.todayOverview),
+        ),
+        if (showMedicine) const _DashboardMedicineToday(),
+        if (showPlans) ...[
+          const _DashboardTodayMeals(),
+          const _DashboardOpenPlans(),
+        ],
+      ],
+    );
+  }
+}
+
+class _DashboardMedicineToday extends ConsumerWidget {
+  const _DashboardMedicineToday();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final medicineTodayAsync = ref.watch(medicineRemindersTodayProvider);
+    final medicineTakenAsync = ref.watch(medicineDosesTakenTodayProvider);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: medicineTodayAsync.when(
+        loading: () => const SizedBox.shrink(),
+        error: (_, __) => const SizedBox.shrink(),
+        data: (reminders) {
+          if (reminders.isEmpty) return const SizedBox.shrink();
+          final takenKeys = medicineTakenAsync.valueOrNull ?? {};
+          final pending = reminders
+              .where(
+                (item) => !takenKeys.contains(
+                  MedicineDoseTracker.doseKey(
+                    item.scheduleId,
+                    item.timeIndex,
+                  ),
+                ),
+              )
+              .toList();
+          final takenCount = reminders.length - pending.length;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _MedicineTodayCard(
+              reminders: reminders,
+              takenKeys: takenKeys,
+              pendingCount: pending.length,
+              takenCount: takenCount,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DashboardTodayMeals extends ConsumerWidget {
+  const _DashboardTodayMeals();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mealsAsync = ref.watch(todayMealPlansProvider);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: mealsAsync.when(
+        loading: () => const SizedBox.shrink(),
+        error: (_, __) => const SizedBox.shrink(),
+        data: (meals) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _TodayEatPlanCard(meals: meals),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardOpenPlans extends ConsumerWidget {
+  const _DashboardOpenPlans();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final overviewAsync = ref.watch(openPlansOverviewProvider);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      child: overviewAsync.when(
+        loading: () => const SizedBox.shrink(),
+        error: (_, __) => const SizedBox.shrink(),
+        data: (overview) {
+          final plans = overview.preview;
+          return _TodayCard(
+            icon: Icons.event_note_outlined,
+            title: AppStrings.openPlans,
+            subtitle: overview.totalCount == 0
+                ? AppStrings.noOpenPlans
+                : '${overview.totalCount} open',
+            onTap: () => context.go('/plans'),
+            moreCount: overview.totalCount > 3 ? overview.totalCount - 3 : 0,
+            emptyText: AppStrings.noOpenPlans,
+            children: plans.take(3).map((plan) {
+              return _TodayRow(
+                title: plan.title,
+                subtitle: [
+                  PlanTypes.labelFor(plan.planType),
+                  if (plan.dueAt != null) Formatters.dateTime(plan.dueAt!),
+                ].join(' · '),
+                icon: DashboardScreen._planIcon(plan.planType),
+              );
+            }).toList(),
+          );
+        },
+      ),
     );
   }
 }

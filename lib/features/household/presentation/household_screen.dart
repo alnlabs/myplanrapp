@@ -6,6 +6,7 @@ import '../../../core/providers/supabase_providers.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/models/family_member.dart';
 import '../../../shared/models/household.dart';
+import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/widgets/async_screen_body.dart';
 import '../../auth/data/auth_repository.dart';
@@ -120,7 +121,10 @@ class HouseholdScreen extends ConsumerWidget {
     }
     if (!hasHousehold) {
       return Scaffold(
-        appBar: AppBar(title: const Text(AppStrings.householdTitle)),
+        appBar: const FeatureScreenAppBar(
+          title: AppStrings.householdTitle,
+          subtitle: AppStrings.householdSubtitle,
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -173,8 +177,9 @@ class HouseholdScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.householdTitle),
+      appBar: FeatureScreenAppBar(
+        title: AppStrings.householdTitle,
+        subtitle: AppStrings.householdSubtitle,
         actions: [
           if (isOwner)
             IconButton(

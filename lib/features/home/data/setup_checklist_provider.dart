@@ -43,16 +43,16 @@ final setupChecklistProvider = FutureProvider<SetupChecklist?>((ref) async {
   final dismissed = await ref.watch(setupChecklistDismissedProvider.future);
   if (dismissed) return null;
 
-  final pantry = await ref.watch(pantryItemsProvider.future);
+  final pantryCount = await ref.watch(pantryItemCountProvider.future);
   final roster = await ref.watch(familyRosterProvider.future);
-  final plans = await ref.watch(plansProvider.future);
-  final expenses = await ref.watch(expensesProvider.future);
+  final hasPlan = await ref.watch(hasAnyPlanProvider.future);
+  final hasExpense = await ref.watch(hasAnyExpenseProvider.future);
 
   final checklist = SetupChecklist(
-    pantryCount: pantry.length,
+    pantryCount: pantryCount,
     hasFamilyMember: roster.length > 1,
-    hasPlan: plans.isNotEmpty,
-    hasExpense: expenses.isNotEmpty,
+    hasPlan: hasPlan,
+    hasExpense: hasExpense,
   );
 
   if (checklist.isComplete) {

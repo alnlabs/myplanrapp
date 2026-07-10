@@ -2,6 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_providers.dart';
+import '../../../shared/constants/list_pagination.dart';
+import '../../../shared/models/paginated_result.dart';
+import '../../../shared/utils/paginated_page_parser.dart';
 import '../../../shared/models/pantry_item.dart';
 import '../../auth/data/auth_repository.dart';
 
@@ -10,15 +13,40 @@ class PantryRepository {
 
   final SupabaseClient _client;
 
-  Future<List<PantryItem>> fetchItems(String householdId) async {
+  Future<PaginatedResult<PantryItem>> fetchItemsPage(
+    String householdId, {
+    required int offset,
+    required int limit,
+  }) async {
     final data = await _client
         .from('pantry_items')
         .select()
         .eq('household_id', householdId)
-        .order('name');
-    return (data as List)
-        .map((e) => PantryItem.fromJson(e as Map<String, dynamic>))
-        .toList();
+        .order('name')
+        .range(offset, offset + limit);
+    return _parsePage(data, limit);
+  }
+
+  Future<int> fetchItemCount(String householdId) async {
+    return _client
+        .from('pantry_items')
+        .count(CountOption.exact)
+        .eq('household_id', householdId);
+  }
+
+  Future<PantryItem?> fetchItem(String id) async {
+    final data = await _client
+        .from('pantry_items')
+        .select()
+        .eq('id', id)
+        .maybeSingle();
+    if (data == null) return null;
+    return PantryItem.fromJson(data);
+  }
+
+  PaginatedResult<PantryItem> _parsePage(dynamic data, int limit) {
+    final parsed = parsePaginatedPage(data, limit, PantryItem.fromJson);
+    return PaginatedResult(items: parsed.items, hasMore: parsed.hasMore);
   }
 
   Future<PantryItem> createItem(PantryItem item, String householdId) async {
@@ -89,17 +117,48 @@ class PantryRepository {
         .map((e) => PantryItem.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  Future<PantryItem> updateAvailabilityStatus(
+    String itemId,
+    String? status,
+  ) async {
+    final data = await _client
+        .from('pantry_items')
+        .update({'availability_status': status})
+        .eq('id', itemId)
+        .select()
+        .single();
+    return PantryItem.fromJson(data);
+  }
 }
 
 final pantryRepositoryProvider = Provider<PantryRepository>((ref) {
   return PantryRepository(ref.watch(supabaseClientProvider));
 });
 
-final pantryItemsProvider = FutureProvider<List<PantryItem>>((ref) async {
+final pantryItemCountProvider = FutureProvider<int>((ref) async {
+  final profile = await ref.watch(userProfileProvider.future);
+  final householdId = profile?.activeHouseholdId;
+  if (householdId == null) return 0;
+  return ref.watch(pantryRepositoryProvider).fetchItemCount(householdId);
+});
+
+final pantryItemProvider =
+    FutureProvider.family<PantryItem?, String>((ref, id) async {
+  return ref.watch(pantryRepositoryProvider).fetchItem(id);
+});
+
+/// First page of items for dropdown pickers (expense form, etc.).
+final pantryPickerItemsProvider = FutureProvider<List<PantryItem>>((ref) async {
   final profile = await ref.watch(userProfileProvider.future);
   final householdId = profile?.activeHouseholdId;
   if (householdId == null) return [];
-  return ref.watch(pantryRepositoryProvider).fetchItems(householdId);
+  final result = await ref.watch(pantryRepositoryProvider).fetchItemsPage(
+        householdId,
+        offset: 0,
+        limit: kPickerPageSize,
+      );
+  return result.items;
 });
 
 final lowStockItemsProvider = FutureProvider<List<PantryItem>>((ref) async {

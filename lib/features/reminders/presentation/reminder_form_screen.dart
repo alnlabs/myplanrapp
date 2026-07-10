@@ -8,7 +8,7 @@ import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/utils/offline_guard.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
-import '../../../shared/widgets/loading_button.dart';
+import '../../../shared/widgets/form_screen_body.dart';
 import '../../../shared/widgets/reminder_field.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../household/presentation/household_screen.dart';
@@ -38,6 +38,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
   bool _loading = false;
   bool _loaded = false;
   String? _error;
+  String? _reminderError;
 
   bool get _isLinked => widget.linkedItem != null;
   bool get _isEdit => widget.standaloneId != null || _isLinked;
@@ -56,31 +57,45 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
     _reminderEnabled = reminder.isActive;
     _reminderAt = reminder.reminderAt;
     _loaded = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _loadLinked(AppReminderItem item) {
     if (_loaded) return;
     _title.text = item.title;
+    _notes.text = item.notes ?? '';
     _reminderEnabled = true;
     _reminderAt = item.reminderAt ?? DateTime.now().add(const Duration(hours: 1));
     _loaded = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_reminderEnabled && _reminderAt == null) {
-      setState(() => _error = AppStrings.reminderAt);
+    final reminderError = Validators.reminderDateTime(
+      enabled: _reminderEnabled,
+      reminderAt: _reminderAt,
+    );
+    if (reminderError != null) {
+      setState(() => _reminderError = reminderError);
       return;
     }
 
     setState(() {
       _loading = true;
       _error = null;
+      _reminderError = null;
     });
 
     try {
       ref.ensureOnline();
       final repo = ref.read(reminderRepositoryProvider);
+      final notesText =
+          _notes.text.trim().isEmpty ? null : _notes.text.trim();
 
       if (_isLinked) {
         final item = widget.linkedItem!;
@@ -90,12 +105,14 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
               planId: item.sourceId,
               reminderAt: _reminderAt!,
               enabled: _reminderEnabled,
+              description: notesText,
             );
           case ReminderSourceType.subscription:
             await repo.updateSubscriptionReminder(
               subscriptionId: item.sourceId,
               reminderAt: _reminderAt!,
               enabled: _reminderEnabled,
+              notes: notesText,
             );
           case ReminderSourceType.medicine:
           case ReminderSourceType.standalone:
@@ -113,7 +130,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
           await repo.updateStandalone(
             existing.copyWith(
               title: _title.text.trim(),
-              notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+              notes: notesText,
               reminderAt: _reminderAt!,
               isActive: _reminderEnabled,
             ),
@@ -122,7 +139,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
           await repo.createStandalone(
             householdId: householdId,
             title: _title.text.trim(),
-            notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+            notes: notesText,
             reminderAt: _reminderAt!,
           );
         }
@@ -145,10 +162,42 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
   @override
   Widget build(BuildContext context) {
     if (widget.standaloneId != null) {
-      final reminderAsync = ref.watch(standaloneReminderProvider(widget.standaloneId!));
+      final reminderAsync =
+          ref.watch(standaloneReminderProvider(widget.standaloneId!));
       reminderAsync.whenData((data) {
         if (data != null) _loadStandalone(data);
       });
+      if (!_loaded) {
+        return Scaffold(
+          appBar: AppBar(
+            title:
+                Text(_isEdit ? AppStrings.editReminder : AppStrings.addReminder),
+          ),
+          body: reminderAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, __) => Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(AppStrings.errorGeneric),
+                  TextButton(
+                    onPressed: () => ref.invalidate(
+                      standaloneReminderProvider(widget.standaloneId!),
+                    ),
+                    child: const Text(AppStrings.retry),
+                  ),
+                ],
+              ),
+            ),
+            data: (data) {
+              if (data == null) {
+                return Center(child: Text(AppStrings.errorGeneric));
+              }
+              return const Center(child: CircularProgressIndicator());
+            },
+          ),
+        );
+      }
     } else if (widget.linkedItem != null) {
       _loadLinked(widget.linkedItem!);
     }
@@ -161,81 +210,81 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
       appBar: AppBar(
         title: Text(_isEdit ? AppStrings.editReminder : AppStrings.addReminder),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (linked != null) ...[
-              _SourceChip(item: linked),
-              const SizedBox(height: 12),
-            ],
-            if (medicineItem != null) ...[
+      body: FormScreenBody(
+        formKey: _formKey,
+        padding: const EdgeInsets.all(24),
+        children: [
+          if (linked != null) ...[
+            _SourceChip(item: linked),
+            const SizedBox(height: kFormFieldSpacing),
+          ],
+          if (medicineItem != null) ...[
+            Text(
+              medicineItem.title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            if (medicineItem.subtitle != null) ...[
+              const SizedBox(height: 4),
               Text(
-                medicineItem.title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
+                medicineItem.subtitle!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
               ),
-              if (medicineItem.subtitle != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  medicineItem.subtitle!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              const Text(AppStrings.reminderMedicineEditHint),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const HouseholdScreen(),
-                  ),
-                ),
-                icon: const Icon(Icons.family_restroom_outlined),
-                label: const Text(AppStrings.householdTitle),
-              ),
-            ] else ...[
-              AppTextField(
-                controller: _title,
-                label: AppStrings.reminderTitle,
-                validator: Validators.required,
-                readOnly: _isLinked,
-              ),
-              if (!_isLinked) ...[
-                const SizedBox(height: 12),
-                AppTextField(
-                  controller: _notes,
-                  label: AppStrings.reminderNotes,
-                  maxLines: 3,
-                ),
-              ],
-              const SizedBox(height: 8),
-              ReminderField(
-                enabled: _reminderEnabled,
-                reminderAt: _reminderAt,
-                onEnabledChanged: (value) => setState(() => _reminderEnabled = value),
-                onReminderAtChanged: (value) => setState(() => _reminderAt = value),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ],
-              const SizedBox(height: 24),
-              LoadingButton(
-                onPressed: _loading ? null : _submit,
-                isLoading: _loading,
-                label: AppStrings.save,
-              ),
             ],
+            const SizedBox(height: kFormFieldSpacing),
+            const Text(AppStrings.reminderMedicineEditHint),
+            const SizedBox(height: kFormFieldSpacing),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const HouseholdScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.family_restroom_outlined),
+              label: const Text(AppStrings.householdTitle),
+            ),
+          ] else ...[
+            AppTextField(
+              controller: _title,
+              label: AppStrings.reminderTitle,
+              validator: Validators.required,
+              readOnly: _isLinked,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: kFormFieldSpacing),
+            AppTextField(
+              controller: _notes,
+              label: AppStrings.reminderNotes,
+              helperText: AppStrings.reminderNotesHint,
+              maxLines: 3,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: kFormFieldSpacing),
+            ReminderField(
+              enabled: _reminderEnabled,
+              reminderAt: _reminderAt,
+              errorText: _reminderError,
+              onEnabledChanged: (value) => setState(() {
+                _reminderEnabled = value;
+                _reminderError = null;
+              }),
+              onReminderAtChanged: (value) => setState(() {
+                _reminderAt = value;
+                _reminderError = null;
+              }),
+            ),
+            const SizedBox(height: 24),
+            FormSaveSection(
+              error: _error,
+              saveLabel: AppStrings.save,
+              isLoading: _loading,
+              onSave: _submit,
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

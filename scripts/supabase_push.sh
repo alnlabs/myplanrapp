@@ -33,9 +33,9 @@ PROJECT_REF="${PROJECT_REF%%.supabase.co}"
 
 if [[ -n "${SUPABASE_DB_URL:-}" ]]; then
   DB_URL="$SUPABASE_DB_URL"
-elif [[ -n "${SUPABASE_POOLER_URL:-}" ]]; then
-  DB_URL="$SUPABASE_POOLER_URL"
 else
+  # Migrations must use the direct connection (5432). The pooler (6543) breaks
+  # prepared statements with: "lrupsc_1_0 already exists".
   DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${PROJECT_REF}.supabase.co:5432/postgres"
 fi
 

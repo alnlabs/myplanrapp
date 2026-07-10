@@ -6,29 +6,37 @@ class HouseholdModules {
   static const shopping = 'shopping';
   static const expenses = 'expenses';
   static const plans = 'plans';
-  static const recipes = 'recipes';
   static const assets = 'assets';
   static const memberDetails = 'member_details';
   static const subscriptions = 'subscriptions';
   static const reminders = 'reminders';
+
+  /// Deprecated module id kept only to strip from stored household settings.
+  static const recipes = 'recipes';
 
   static const defaultEnabled = [
     pantry,
     shopping,
     expenses,
     plans,
-    recipes,
     assets,
     memberDetails,
     reminders,
   ];
+
+  static const activeModules = defaultEnabled;
+
+  /// Drops deprecated module ids (e.g. removed [recipes]) from stored settings.
+  static Set<String> sanitizeEnabled(Iterable<String> modules) {
+    return modules.where(activeModules.contains).toSet();
+  }
 }
 
 class HouseholdInterests {
   HouseholdInterests._();
 
   static const groceries = 'groceries';
-  static const recipes = 'recipes_cooking';
+  static const meals = 'meals_cooking';
   static const expenses = 'expenses';
   static const plans = 'plans_reminders';
   static const assets = 'home_assets';
@@ -37,7 +45,7 @@ class HouseholdInterests {
 
   static const all = [
     (id: groceries, label: 'Groceries & pantry', icon: '🥫'),
-    (id: recipes, label: 'Recipes & cooking', icon: '🍳'),
+    (id: meals, label: 'Meals & cooking', icon: '🍳'),
     (id: expenses, label: 'Household expenses', icon: '💰'),
     (id: plans, label: 'Plans & reminders', icon: '📅'),
     (id: assets, label: 'Home items & warranty', icon: '📺'),
@@ -58,11 +66,15 @@ class HouseholdInterests {
 
   static const _interestModules = <String, List<String>>{
     groceries: [HouseholdModules.pantry, HouseholdModules.shopping],
-    recipes: [HouseholdModules.recipes, HouseholdModules.pantry],
+    meals: [HouseholdModules.plans, HouseholdModules.pantry],
     expenses: [HouseholdModules.expenses],
     plans: [HouseholdModules.plans, HouseholdModules.reminders],
     assets: [HouseholdModules.assets],
     familyHealth: [HouseholdModules.memberDetails, HouseholdModules.reminders],
-    bills: [HouseholdModules.subscriptions, HouseholdModules.expenses, HouseholdModules.reminders],
+    bills: [
+      HouseholdModules.subscriptions,
+      HouseholdModules.expenses,
+      HouseholdModules.reminders,
+    ],
   };
 }

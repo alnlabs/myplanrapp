@@ -12,7 +12,6 @@ import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
 import '../../auth/data/auth_repository.dart';
-import '../../recipes/data/recipe_repository.dart';
 import '../data/family_repository.dart';
 import '../data/household_settings_repository.dart';
 
@@ -176,9 +175,6 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
             widget.householdId,
             modules,
           );
-      await ref
-          .read(recipeRepositoryProvider)
-          .seedDefaultRecipes(widget.householdId);
       ref.invalidate(householdSettingsProvider);
       ref.invalidate(enabledModulesProvider);
       if (mounted) context.go('/home');

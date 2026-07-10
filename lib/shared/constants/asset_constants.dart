@@ -29,8 +29,8 @@ class AssetKinds {
   static const borrowed = 'borrowed';
 
   static const all = [
-    (value: permanent, label: 'Permanent'),
-    (value: temporary, label: 'Temporary'),
+    (value: permanent, label: 'Owned — long term'),
+    (value: temporary, label: 'Short-term use'),
     (value: borrowed, label: 'Borrowed'),
   ];
 }

@@ -10,12 +10,36 @@ class Validators {
     return null;
   }
 
+  static String? requiredSelection(String? value) {
+    if (value == null || value.isEmpty) {
+      return AppStrings.requiredField;
+    }
+    return null;
+  }
+
+  static String? category(String? value) {
+    if (value == null || value.isEmpty) {
+      return AppStrings.selectCategory;
+    }
+    return null;
+  }
+
+  static String? reminderDateTime({
+    required bool enabled,
+    DateTime? reminderAt,
+  }) {
+    if (enabled && reminderAt == null) {
+      return AppStrings.pickReminderDateTime;
+    }
+    return null;
+  }
+
   static String? email(String? value) {
     final requiredError = required(value);
     if (requiredError != null) return requiredError;
     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
     if (!emailRegex.hasMatch(value!.trim())) {
-      return 'Enter a valid email address';
+      return AppStrings.invalidEmail;
     }
     return null;
   }
@@ -25,10 +49,10 @@ class Validators {
     if (requiredError != null) return requiredError;
     final trimmed = value!.trim();
     if (trimmed.length < 3) {
-      return 'Username must be at least 3 characters';
+      return AppStrings.usernameTooShort;
     }
     if (!RegExp(r'^[a-zA-Z0-9_.]+$').hasMatch(trimmed)) {
-      return 'Use only letters, numbers, dot, or underscore';
+      return AppStrings.usernameInvalidChars;
     }
     return null;
   }
@@ -37,7 +61,7 @@ class Validators {
     final requiredError = required(value);
     if (requiredError != null) return requiredError;
     if (value!.length < 6) {
-      return 'Password must be at least 6 characters';
+      return AppStrings.passwordTooShort;
     }
     return null;
   }
