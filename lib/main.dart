@@ -17,6 +17,7 @@ import 'core/theme/app_theme.dart';
 import 'features/alerts/services/notification_service.dart';
 import 'features/app_updates/services/app_review_service.dart';
 import 'features/app_updates/services/app_update_service.dart';
+import 'features/admin/data/error_report_uploader.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/household/data/medicine_schedule_repository.dart';
 import 'features/plans/data/plan_repository.dart';
@@ -90,6 +91,7 @@ class _BootstrapAppState extends State<BootstrapApp> {
           ),
         );
         AppLogger.instance.info('Supabase initialized');
+        ErrorReportUploader.enable(Supabase.instance.client);
         await NotificationService.instance.initialize();
         AppLogger.instance.info('Notifications initialized');
       } catch (e, s) {
@@ -153,9 +155,15 @@ class _MyPlanrAppState extends ConsumerState<MyPlanrApp> {
       if (householdId == null) return;
       await Future.wait([
         ref.read(planRepositoryProvider).rescheduleAllReminders(householdId),
-        ref.read(subscriptionRepositoryProvider).rescheduleAllReminders(householdId),
-        ref.read(medicineScheduleRepositoryProvider).rescheduleAllReminders(householdId),
-        ref.read(reminderRepositoryProvider).rescheduleAllReminders(householdId),
+        ref
+            .read(subscriptionRepositoryProvider)
+            .rescheduleAllReminders(householdId),
+        ref
+            .read(medicineScheduleRepositoryProvider)
+            .rescheduleAllReminders(householdId),
+        ref
+            .read(reminderRepositoryProvider)
+            .rescheduleAllReminders(householdId),
       ]);
     } catch (_) {}
   }

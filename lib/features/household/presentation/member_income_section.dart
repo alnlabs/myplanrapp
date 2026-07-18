@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/utils/formatters.dart';
+import '../../../shared/widgets/value_text.dart';
 import '../../expenses/data/expense_repository.dart';
 import '../../expenses/presentation/add_income_screen.dart';
 
@@ -82,10 +83,17 @@ class MemberIncomeSection extends ConsumerWidget {
                     ...rows.map(
                       (row) => ListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: Text(row.incomeSource),
-                        trailing: Text(
-                          Formatters.currency(row.earnedTotal),
-                          style: Theme.of(context).textTheme.titleSmall,
+                        title: Text(
+                          row.incomeSource,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 120),
+                          child: ValueText(
+                            Formatters.currency(row.earnedTotal),
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
                         ),
                         onTap: canEdit
                             ? () async {

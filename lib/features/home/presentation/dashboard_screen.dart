@@ -15,6 +15,7 @@ import '../../../shared/models/plan.dart';
 import '../../../shared/models/subscription.dart';
 import '../../../shared/models/user_profile.dart';
 import '../../../shared/utils/formatters.dart';
+import '../../../shared/widgets/value_text.dart';
 import '../../alerts/presentation/alerts_screen.dart';
 import '../../assets/data/asset_repository.dart';
 import '../../auth/data/auth_repository.dart';
@@ -471,16 +472,29 @@ class _SummaryCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: theme.textTheme.labelLarge),
-                    Text(subtitle, style: theme.textTheme.bodySmall),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge,
+                    ),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
                   ],
                 ),
               ),
-              Text(
-                value,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.primary,
+              const SizedBox(width: 12),
+              Flexible(
+                child: ValueText(
+                  value,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
               ),
             ],

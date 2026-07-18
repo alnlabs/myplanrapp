@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myplanr/core/strings/app_strings.dart';
 import 'package:myplanr/features/expenses/data/expense_repository.dart';
@@ -13,6 +12,8 @@ void main() {
   final overrides = [
     incomeCategoriesProvider.overrideWith((ref) async => testIncomeCategories),
     familyRosterProvider.overrideWith((ref) async => testFamilyMembers),
+    currentUserFamilyMemberProvider
+        .overrideWith((ref) async => testFamilyMembers.first),
   ];
 
   group('AddIncomeScreen widget', () {
@@ -69,6 +70,8 @@ void main() {
         overrides: [
           incomeCategoriesProvider.overrideWith((ref) async => []),
           familyRosterProvider.overrideWith((ref) async => testFamilyMembers),
+          currentUserFamilyMemberProvider
+              .overrideWith((ref) async => testFamilyMembers.first),
         ],
         child: const AddIncomeScreen(),
       );

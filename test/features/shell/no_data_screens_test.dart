@@ -82,10 +82,8 @@ void main() {
         child: const FamilyMemberDetailScreen(memberId: memberId),
       );
 
-      expect(find.text(AppStrings.tabOverview), findsOneWidget);
-      expect(find.text(AppStrings.phone), findsWidgets);
-      await enterTextByLabel(tester, AppStrings.workPlace, 'Remote Office');
-      expect(find.text('Remote Office'), findsOneWidget);
+      expect(find.textContaining('Alex'), findsWidgets);
+      expect(find.text(AppStrings.sectionContact), findsNothing);
       expect(find.text(AppStrings.bloodGroup), findsNothing);
     });
 

@@ -5,7 +5,6 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -13,43 +12,6 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val channelName = "com.alnlabs.myplanr/notification_sounds"
     private var pendingPickResult: MethodChannel.Result? = null
-
-    private val ringtonePickerLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            val pending = pendingPickResult
-            pendingPickResult = null
-            if (pending == null) return@registerForActivityResult
-
-            if (result.resultCode != RESULT_OK) {
-                pending.success(null)
-                return@registerForActivityResult
-            }
-
-            val uri: Uri? =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    result.data?.getParcelableExtra(
-                        RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
-                        Uri::class.java,
-                    )
-                } else {
-                    @Suppress("DEPRECATION")
-                    result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
-                }
-
-            if (uri == null) {
-                pending.success(null)
-                return@registerForActivityResult
-            }
-
-            val ringtone = RingtoneManager.getRingtone(applicationContext, uri)
-            val title = ringtone?.getTitle(applicationContext)
-            pending.success(
-                mapOf(
-                    "uri" to uri.toString(),
-                    "title" to title,
-                ),
-            )
-        }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -106,6 +68,49 @@ class MainActivity : FlutterActivity() {
                     putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(currentUri))
                 }
             }
-        ringtonePickerLauncher.launch(intent)
+        startActivityForResult(intent, RINGTONE_PICKER_REQUEST)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != RINGTONE_PICKER_REQUEST) return
+
+        val pending = pendingPickResult
+        pendingPickResult = null
+        if (pending == null) return
+
+        if (resultCode != RESULT_OK) {
+            pending.success(null)
+            return
+        }
+
+        val uri: Uri? =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                data?.getParcelableExtra(
+                    RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
+                    Uri::class.java,
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            }
+
+        if (uri == null) {
+            pending.success(null)
+            return
+        }
+
+        val ringtone = RingtoneManager.getRingtone(applicationContext, uri)
+        val title = ringtone?.getTitle(applicationContext)
+        pending.success(
+            mapOf(
+                "uri" to uri.toString(),
+                "title" to title,
+            ),
+        )
+    }
+
+    companion object {
+        private const val RINGTONE_PICKER_REQUEST = 4201
     }
 }

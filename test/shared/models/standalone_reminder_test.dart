@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:myplanr/shared/constants/reminder_repeat.dart';
 import 'package:myplanr/shared/models/standalone_reminder.dart';
 
 void main() {
@@ -47,6 +48,48 @@ void main() {
       expect(updated.title, 'New');
       expect(updated.isActive, isFalse);
       expect(updated.reminderAt, reminderAt);
+    });
+
+    test('defaults repeat to none and is not recurring', () {
+      final reminder = StandaloneReminder.fromJson({
+        'id': 'r1',
+        'household_id': 'hh',
+        'user_id': 'u1',
+        'title': 'Task',
+        'reminder_at': '2026-07-08T10:30:00Z',
+        'is_active': true,
+      });
+      expect(reminder.repeat, ReminderRepeat.none);
+      expect(reminder.isRecurring, isFalse);
+    });
+
+    test('parses repeat and reports recurring, round-trips in json', () {
+      final reminder = StandaloneReminder.fromJson({
+        'id': 'r1',
+        'household_id': 'hh',
+        'user_id': 'u1',
+        'title': 'Task',
+        'reminder_at': '2026-07-08T10:30:00Z',
+        'is_active': true,
+        'repeat': 'weekly',
+      });
+      expect(reminder.repeat, ReminderRepeat.weekly);
+      expect(reminder.isRecurring, isTrue);
+      expect(reminder.toInsertJson('hh', 'u1')['repeat'], 'weekly');
+      expect(reminder.toUpdateJson()['repeat'], 'weekly');
+    });
+
+    test('normalizes unknown repeat values to none', () {
+      final reminder = StandaloneReminder.fromJson({
+        'id': 'r1',
+        'household_id': 'hh',
+        'user_id': 'u1',
+        'title': 'Task',
+        'reminder_at': '2026-07-08T10:30:00Z',
+        'is_active': true,
+        'repeat': 'fortnightly',
+      });
+      expect(reminder.repeat, ReminderRepeat.none);
     });
   });
 }

@@ -6,6 +6,7 @@ import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/utils/offline_guard.dart';
 import '../../../shared/widgets/async_screen_body.dart';
+import '../../../shared/widgets/value_text.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/expense_date_filter_provider.dart';
 import '../data/expense_repository.dart';
@@ -134,7 +135,11 @@ class ExpenseSummaryScreen extends ConsumerWidget {
                         ),
                         ...rows.map(
                           (row) => ListTile(
-                            title: Text(row.memberName),
+                            title: Text(
+                              row.memberName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             trailing: Text(
                               Formatters.currency(row.earnedTotal),
                             ),
@@ -164,7 +169,11 @@ class ExpenseSummaryScreen extends ConsumerWidget {
                         ),
                         ...rows.map(
                           (row) => ListTile(
-                            title: Text(row.categoryName),
+                            title: Text(
+                              row.categoryName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             trailing: Text(
                               Formatters.currency(row.totalAmount),
                             ),
@@ -203,10 +212,19 @@ class _SummaryRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Expanded(child: Text(label)),
-          Text(
-            Formatters.currency(amount),
-            style: style?.copyWith(fontWeight: FontWeight.w600),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: ValueText(
+              Formatters.currency(amount),
+              style: style?.copyWith(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),

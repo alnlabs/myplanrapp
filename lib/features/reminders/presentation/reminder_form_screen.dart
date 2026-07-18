@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
+import '../../../shared/constants/reminder_repeat.dart';
 import '../../../shared/models/app_reminder_item.dart';
 import '../../../shared/models/standalone_reminder.dart';
 import '../../../shared/utils/api_error_formatter.dart';
@@ -35,6 +36,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
 
   bool _reminderEnabled = true;
   DateTime? _reminderAt;
+  String _repeat = ReminderRepeat.none;
   bool _loading = false;
   bool _loaded = false;
   String? _error;
@@ -56,6 +58,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
     _notes.text = reminder.notes ?? '';
     _reminderEnabled = reminder.isActive;
     _reminderAt = reminder.reminderAt;
+    _repeat = reminder.repeat;
     _loaded = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() {});
@@ -133,6 +136,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
               notes: notesText,
               reminderAt: _reminderAt!,
               isActive: _reminderEnabled,
+              repeat: _reminderEnabled ? _repeat : ReminderRepeat.none,
             ),
           );
         } else {
@@ -141,6 +145,7 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
             title: _title.text.trim(),
             notes: notesText,
             reminderAt: _reminderAt!,
+            repeat: _reminderEnabled ? _repeat : ReminderRepeat.none,
           );
         }
       }
@@ -276,6 +281,27 @@ class _ReminderFormScreenState extends ConsumerState<ReminderFormScreen> {
                 _reminderError = null;
               }),
             ),
+            if (_reminderEnabled) ...[
+              const SizedBox(height: kFormFieldSpacing),
+              DropdownButtonFormField<String>(
+                value: ReminderRepeat.normalize(_repeat),
+                decoration: const InputDecoration(
+                  labelText: AppStrings.reminderRepeatLabel,
+                  helperText: AppStrings.reminderRepeatHint,
+                  prefixIcon: Icon(Icons.repeat),
+                ),
+                items: [
+                  for (final option in ReminderRepeat.all)
+                    DropdownMenuItem(
+                      value: option.value,
+                      child: Text(option.label),
+                    ),
+                ],
+                onChanged: (value) => setState(
+                  () => _repeat = value ?? ReminderRepeat.none,
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             FormSaveSection(
               error: _error,

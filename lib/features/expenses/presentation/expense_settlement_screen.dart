@@ -195,10 +195,16 @@ class _ExpenseSettlementScreenState extends ConsumerState<ExpenseSettlementScree
               const SizedBox(height: 8),
               ...balances.map(
                 (b) => ListTile(
-                  title: Text(b.displayName),
+                  title: Text(
+                    b.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   subtitle: Text(
                     '${AppStrings.moneySpent}: ${Formatters.currency(b.paidTotal)} · '
                     'owed: ${Formatters.currency(b.owedTotal)}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   trailing: Text(Formatters.currency(b.netBalance)),
                 ),
@@ -215,7 +221,11 @@ class _ExpenseSettlementScreenState extends ConsumerState<ExpenseSettlementScree
                 ...suggestions.map(
                   (s) => Card(
                     child: ListTile(
-                      title: Text('${s.fromName} → ${s.toName}'),
+                      title: Text(
+                        '${s.fromName} → ${s.toName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       trailing: TextButton(
                         onPressed: _recording
                             ? null

@@ -10,10 +10,9 @@ import '../../../shared/utils/formatters.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/async_screen_body.dart';
-import '../../../shared/widgets/loading_button.dart';
-import '../../auth/data/auth_repository.dart';
 import '../data/family_repository.dart';
 import '../data/household_repository.dart';
+import 'family_member_edit_screen.dart';
 import 'medicine_schedules_section.dart';
 import 'member_avatar_picker.dart';
 import 'member_income_section.dart';
@@ -36,135 +35,8 @@ class FamilyMemberDetailScreen extends ConsumerStatefulWidget {
       _FamilyMemberDetailScreenState();
 }
 
-class _FamilyMemberDetailScreenState extends ConsumerState<FamilyMemberDetailScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 3, vsync: this);
-  bool _saving = false;
-  String? _error;
-
-  final _phone = TextEditingController();
-  final _altPhone = TextEditingController();
-  final _bloodGroup = TextEditingController();
-  final _allergies = TextEditingController();
-  final _medicines = TextEditingController();
-  final _doctorName = TextEditingController();
-  final _doctorPhone = TextEditingController();
-  final _foodAllergies = TextEditingController();
-  final _workPlace = TextEditingController();
-  final _schoolName = TextEditingController();
-  final _emergencyName = TextEditingController();
-  final _emergencyPhone = TextEditingController();
-  final _emergencyRelation = TextEditingController();
-  final _notes = TextEditingController();
-  final _shirtSize = TextEditingController();
-  final _pantsSize = TextEditingController();
-  final _shoeSize = TextEditingController();
-  final _displayName = TextEditingController();
-  String? _dietaryPreference;
-  Map<String, bool> _visibility = {
-    MemberVisibilityKeys.phone: true,
-    MemberVisibilityKeys.health: true,
-    MemberVisibilityKeys.emergency: true,
-  };
-  bool _loaded = false;
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    _phone.dispose();
-    _altPhone.dispose();
-    _bloodGroup.dispose();
-    _allergies.dispose();
-    _medicines.dispose();
-    _doctorName.dispose();
-    _doctorPhone.dispose();
-    _foodAllergies.dispose();
-    _workPlace.dispose();
-    _schoolName.dispose();
-    _emergencyName.dispose();
-    _emergencyPhone.dispose();
-    _emergencyRelation.dispose();
-    _notes.dispose();
-    _shirtSize.dispose();
-    _pantsSize.dispose();
-    _shoeSize.dispose();
-    _displayName.dispose();
-    super.dispose();
-  }
-
-  void _loadProfileName(String? name) {
-    if (!widget.profileMode || name == null) return;
-    if (_displayName.text.isEmpty) {
-      _displayName.text = name;
-    }
-  }
-
-  void _loadDetails(FamilyMemberDetails? details) {
-    if (_loaded || details == null) return;
-    _phone.text = details.phone ?? '';
-    _altPhone.text = details.altPhone ?? '';
-    _bloodGroup.text = details.bloodGroup ?? '';
-    _allergies.text = details.allergies ?? '';
-    _medicines.text = details.medicines ?? '';
-    _doctorName.text = details.doctorName ?? '';
-    _doctorPhone.text = details.doctorPhone ?? '';
-    _foodAllergies.text = details.foodAllergies ?? '';
-    _workPlace.text = details.workPlace ?? '';
-    _schoolName.text = details.schoolName ?? '';
-    _emergencyName.text = details.emergencyContactName ?? '';
-    _emergencyPhone.text = details.emergencyContactPhone ?? '';
-    _emergencyRelation.text = details.emergencyContactRelation ?? '';
-    _notes.text = details.notes ?? '';
-    _shirtSize.text = details.clothingSizes[ClothingSizeKeys.shirt] ?? '';
-    _pantsSize.text = details.clothingSizes[ClothingSizeKeys.pants] ?? '';
-    _shoeSize.text = details.clothingSizes[ClothingSizeKeys.shoes] ?? '';
-    _dietaryPreference = details.dietaryPreference;
-    if (details.visibility.isNotEmpty) {
-      _visibility = {
-        for (final key in MemberVisibilityKeys.all)
-          key: details.isVisible(key),
-      };
-    }
-    _loaded = true;
-  }
-
-  FamilyMemberDetails _buildDetails(FamilyMember member, FamilyMemberDetails? existing) {
-    return FamilyMemberDetails(
-      familyMemberId: member.id,
-      householdId: member.householdId,
-      userId: member.userId,
-      phone: _emptyToNull(_phone.text),
-      altPhone: _emptyToNull(_altPhone.text),
-      bloodGroup: _emptyToNull(_bloodGroup.text),
-      allergies: _emptyToNull(_allergies.text),
-      medicines: _emptyToNull(_medicines.text),
-      doctorName: _emptyToNull(_doctorName.text),
-      doctorPhone: _emptyToNull(_doctorPhone.text),
-      dietaryPreference: _dietaryPreference,
-      foodAllergies: _emptyToNull(_foodAllergies.text),
-      workPlace: _emptyToNull(_workPlace.text),
-      schoolName: _emptyToNull(_schoolName.text),
-      emergencyContactName: _emptyToNull(_emergencyName.text),
-      emergencyContactPhone: _emptyToNull(_emergencyPhone.text),
-      emergencyContactRelation: _emptyToNull(_emergencyRelation.text),
-      notes: _emptyToNull(_notes.text),
-      dateOfBirth: existing?.dateOfBirth ?? member.dateOfBirth,
-      avatarUrl: existing?.avatarUrl,
-      clothingSizes: {
-        if (_shirtSize.text.trim().isNotEmpty)
-          ClothingSizeKeys.shirt: _shirtSize.text.trim(),
-        if (_pantsSize.text.trim().isNotEmpty)
-          ClothingSizeKeys.pants: _pantsSize.text.trim(),
-        if (_shoeSize.text.trim().isNotEmpty)
-          ClothingSizeKeys.shoes: _shoeSize.text.trim(),
-      },
-      visibility: _visibility,
-    );
-  }
-
-  String? _emptyToNull(String value) =>
-      value.trim().isEmpty ? null : value.trim();
-
+class _FamilyMemberDetailScreenState
+    extends ConsumerState<FamilyMemberDetailScreen> {
   bool _isSectionPrivate(
     FamilyMemberDetails? details,
     bool canEdit,
@@ -173,69 +45,15 @@ class _FamilyMemberDetailScreenState extends ConsumerState<FamilyMemberDetailScr
     return !canEdit && details != null && !details.isVisible(key);
   }
 
-  Widget _privateBanner() {
-    return Card(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(
-              Icons.lock_outline,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                AppStrings.sectionPrivate,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ),
-          ],
+  void _openEdit() {
+    Navigator.of(context).push(
+      MaterialPageRoute<bool>(
+        builder: (_) => FamilyMemberEditScreen(
+          memberId: widget.memberId,
+          profileMode: widget.profileMode,
         ),
       ),
     );
-  }
-
-  Future<void> _save(FamilyMember member, FamilyMemberDetails? existing) async {
-    if (widget.profileMode) {
-      final nameError = Validators.required(_displayName.text);
-      if (nameError != null) {
-        setState(() => _error = nameError);
-        return;
-      }
-    }
-
-    setState(() {
-      _saving = true;
-      _error = null;
-    });
-    try {
-      if (widget.profileMode) {
-        await ref
-            .read(authRepositoryProvider)
-            .updateDisplayName(_displayName.text.trim());
-        ref.invalidate(userProfileProvider);
-        ref.invalidate(familyRosterProvider);
-        ref.invalidate(familyMemberProvider(member.id));
-      }
-      await ref.read(familyRepositoryProvider).upsertDetails(
-            member.id,
-            _buildDetails(member, existing),
-          );
-      ref.invalidate(familyMemberDetailsProvider(member.id));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.saved)),
-        );
-      }
-    } catch (e) {
-      setState(() => _error = ApiErrorFormatter.format(e));
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
   }
 
   Future<void> _remove(FamilyMember member) async {
@@ -306,7 +124,8 @@ class _FamilyMemberDetailScreenState extends ConsumerState<FamilyMemberDetailScr
     final error = Validators.email(email);
     if (error != null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error)));
       }
       return;
     }
@@ -344,10 +163,7 @@ class _FamilyMemberDetailScreenState extends ConsumerState<FamilyMemberDetailScr
     );
   }
 
-  Future<void> _changeRole(
-    FamilyMember member,
-    String role,
-  ) async {
+  Future<void> _changeRole(FamilyMember member, String role) async {
     final userId = member.userId;
     if (userId == null) return;
     try {
@@ -414,28 +230,28 @@ class _FamilyMemberDetailScreenState extends ConsumerState<FamilyMemberDetailScr
     final memberAsync = ref.watch(familyMemberProvider(widget.memberId));
     final detailsAsync = ref.watch(familyMemberDetailsProvider(widget.memberId));
     final currentUserId = ref.watch(currentUserIdProvider);
-    final profileAsync = ref.watch(userProfileProvider);
     final email = ref.watch(supabaseClientProvider).auth.currentUser?.email;
+    final members = ref.watch(householdMembersProvider).valueOrNull ?? [];
+    final household = ref.watch(activeHouseholdProvider).valueOrNull;
 
-    profileAsync.whenData((profile) => _loadProfileName(profile?.displayName));
+    final headMember = memberAsync.valueOrNull;
+    final canEditAppBar = _canEdit(headMember, members, household, currentUserId);
 
     return Scaffold(
       appBar: AppBar(
         title: widget.profileMode
             ? const Text(AppStrings.profileTitle)
-            : memberAsync.when(
-                data: (m) => Text(m?.listLabel ?? AppStrings.members),
-                loading: () => const Text(AppStrings.members),
-                error: (_, __) => const Text(AppStrings.members),
-              ),
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: const [
-            Tab(text: AppStrings.tabOverview),
-            Tab(text: AppStrings.tabHealth),
-            Tab(text: AppStrings.tabEmergency),
-          ],
-        ),
+            : Text(headMember?.listLabel ?? AppStrings.members),
+        actions: [
+          if (canEditAppBar)
+            IconButton(
+              onPressed: _openEdit,
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: widget.profileMode
+                  ? AppStrings.editProfile
+                  : AppStrings.editDetails,
+            ),
+        ],
       ),
       body: AsyncScreenBody(
         value: memberAsync,
@@ -445,472 +261,479 @@ class _FamilyMemberDetailScreenState extends ConsumerState<FamilyMemberDetailScr
             return const Center(child: Text(AppStrings.errorGeneric));
           }
 
-          detailsAsync.whenData(_loadDetails);
           final details = detailsAsync.valueOrNull;
           final isSelf = member.userId == currentUserId;
-          final members = ref.watch(householdMembersProvider).valueOrNull ?? [];
-          final household = ref.watch(activeHouseholdProvider).valueOrNull;
-          final isManager = members.any(
-            (m) =>
-                m.userId == currentUserId &&
-                (m.role == 'owner' || m.role == 'co_owner'),
-          );
-          final isOwner = household?.ownerId == currentUserId ||
-              members.any(
-                (m) => m.userId == currentUserId && m.role == 'owner',
-              );
+          final isManager = _isManager(members, currentUserId);
+          final isOwner = _isOwner(members, household, currentUserId);
           final membership = membershipForUser(members, member.userId);
-          final managedByYou =
-              !widget.profileMode &&
+          final managedByYou = !widget.profileMode &&
               member.isRosterOnly &&
               member.createdBy == currentUserId;
-          final canEdit = widget.profileMode || isManager || isSelf || managedByYou;
+          final canEdit = _canEdit(member, members, household, currentUserId);
 
-          return Column(
-            children: [
-              if (managedByYou)
-                const MaterialBanner(
-                  content: Text(AppStrings.managedByYou),
-                  leading: Icon(Icons.supervisor_account_outlined),
-                  actions: [SizedBox.shrink()],
-                ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabs,
-                  children: [
-                    _overviewTab(
-                      member,
-                      details,
-                      isSelf,
-                      isManager,
-                      isOwner,
-                      canEdit,
-                      membership,
-                      currentUserId,
-                      email,
-                    ),
-                    _healthTab(member, details, canEdit),
-                    _formTab(
-                      member,
-                      details,
-                      [
-                        AppTextField(
-                          controller: _emergencyName,
-                          label: AppStrings.emergencyContactName,
-                          readOnly: !canEdit,
-                        ),
-                        const SizedBox(height: 12),
-                        AppTextField(
-                          controller: _emergencyPhone,
-                          label: AppStrings.emergencyContactPhone,
-                          keyboardType: TextInputType.phone,
-                          readOnly: !canEdit,
-                        ),
-                        const SizedBox(height: 12),
-                        AppTextField(
-                          controller: _emergencyRelation,
-                          label: AppStrings.emergencyContactRelation,
-                          readOnly: !canEdit,
-                        ),
-                        const SizedBox(height: 12),
-                        AppTextField(
-                          controller: _notes,
-                          label: AppStrings.notes,
-                          maxLines: 4,
-                          readOnly: !canEdit,
-                        ),
-                      ],
-                      canEdit: canEdit,
-                      isPrivate: _isSectionPrivate(
-                        details,
-                        canEdit,
-                        MemberVisibilityKeys.emergency,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: _buildContent(
+              member: member,
+              details: details,
+              email: email,
+              isSelf: isSelf,
+              isManager: isManager,
+              isOwner: isOwner,
+              membership: membership,
+              managedByYou: managedByYou,
+              canEdit: canEdit,
+              currentUserId: currentUserId,
+            ),
           );
         },
       ),
+      floatingActionButton: canEditAppBar
+          ? FloatingActionButton.extended(
+              onPressed: _openEdit,
+              icon: const Icon(Icons.edit_outlined),
+              label: Text(
+                widget.profileMode
+                    ? AppStrings.editProfile
+                    : AppStrings.editDetails,
+              ),
+            )
+          : null,
     );
   }
 
-  Widget _overviewTab(
-    FamilyMember member,
-    FamilyMemberDetails? details,
-    bool isSelf,
-    bool isManager,
-    bool isOwner,
-    bool canEdit,
-    HouseholdMember? membership,
+  bool _isManager(List<HouseholdMember> members, String? currentUserId) {
+    return members.any(
+      (m) =>
+          m.userId == currentUserId &&
+          (m.role == 'owner' || m.role == 'co_owner'),
+    );
+  }
+
+  bool _isOwner(
+    List<HouseholdMember> members,
+    Household? household,
     String? currentUserId,
-    String? email,
   ) {
+    return household?.ownerId == currentUserId ||
+        members.any((m) => m.userId == currentUserId && m.role == 'owner');
+  }
+
+  bool _canEdit(
+    FamilyMember? member,
+    List<HouseholdMember> members,
+    Household? household,
+    String? currentUserId,
+  ) {
+    if (member == null) return widget.profileMode;
+    final isSelf = member.userId == currentUserId;
+    final managedByYou = !widget.profileMode &&
+        member.isRosterOnly &&
+        member.createdBy == currentUserId;
+    return widget.profileMode ||
+        _isManager(members, currentUserId) ||
+        isSelf ||
+        managedByYou;
+  }
+
+  List<Widget> _buildContent({
+    required FamilyMember member,
+    required FamilyMemberDetails? details,
+    required String? email,
+    required bool isSelf,
+    required bool isManager,
+    required bool isOwner,
+    required HouseholdMember? membership,
+    required bool managedByYou,
+    required bool canEdit,
+    required String? currentUserId,
+  }) {
     final phonePrivate =
         _isSectionPrivate(details, canEdit, MemberVisibilityKeys.phone);
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (widget.profileMode) ...[
-          Text(
-            AppStrings.accountInfo,
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          if (email != null) _infoRow(AppStrings.email, email),
-          const SizedBox(height: 8),
-          AppTextField(
-            controller: _displayName,
-            label: AppStrings.displayName,
-            readOnly: !canEdit,
-          ),
-          const SizedBox(height: 20),
-        ],
-        MemberAvatarPicker(
-          familyMemberId: member.id,
-          householdId: member.householdId,
-          displayName: member.listLabel,
-          avatarPath: details?.avatarUrl,
-          canEdit: canEdit,
-          existingDetails: details ?? FamilyMemberDetails(
-            familyMemberId: member.id,
-            householdId: member.householdId,
-            userId: member.userId,
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (!widget.profileMode) ...[
-          _infoRow(AppStrings.relationship, member.relationshipLabel),
-          _infoRow(
-            AppStrings.memberType,
-            member.isAppMember ? AppStrings.appMember : AppStrings.profileOnly,
-          ),
-        ],
-        if (!widget.profileMode && membership != null)
-          _infoRow(AppStrings.appRole, roleLabel(membership.role)),
-        if (!widget.profileMode &&
-            isOwner &&
-            member.isAppMember &&
-            membership != null &&
-            canChangeRole(
-              isOwner: isOwner,
-              targetUserId: member.userId,
-              currentUserId: currentUserId,
-              targetRole: membership.role,
-            ))
-          Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 8),
-            child: MemberRoleActions(
-              currentRole: membership.role,
-              onMakeCoOwner: () => _changeRole(member, 'co_owner'),
-              onMakeMember: () => _changeRole(member, 'member'),
-            ),
-          ),
-        if (!widget.profileMode &&
-            isOwner &&
-            member.isRosterOnly &&
-            !member.isPendingInvite)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              AppStrings.coOwnerRequiresApp,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-            ),
-          ),
-        if (!widget.profileMode && isOwner && member.relationship != 'self')
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => member.isAppMember
-                  ? _convertToProfileOnly(member)
-                  : _convertToApp(member),
-              icon: Icon(
-                member.isAppMember
-                    ? Icons.person_outline
-                    : Icons.mail_outline,
-              ),
-              label: Text(
-                member.isAppMember
-                    ? AppStrings.makeProfileOnly
-                    : AppStrings.inviteToApp,
-              ),
-            ),
-          ),
-        if (!widget.profileMode && member.isPendingInvite)
-          _infoRow(AppStrings.status, AppStrings.pendingInvite),
-        if (!widget.profileMode && member.invitedEmail != null)
-          _infoRow(AppStrings.email, member.invitedEmail!),
-        if (!phonePrivate &&
-            (details?.phone != null || member.phone != null))
-          _infoRow(AppStrings.phone, details?.phone ?? member.phone!),
-        if (details?.dateOfBirth != null || member.dateOfBirth != null)
-          _infoRow(
-            AppStrings.dateOfBirth,
-            Formatters.date(details?.dateOfBirth ?? member.dateOfBirth!),
-          ),
-        if (details?.workPlace != null)
-          _infoRow(AppStrings.workPlace, details!.workPlace!),
-        if (details?.schoolName != null)
-          _infoRow(AppStrings.schoolName, details!.schoolName!),
-        const SizedBox(height: 16),
-        if (phonePrivate) ...[
-          _privateBanner(),
-        ] else ...[
-          AppTextField(
-            controller: _phone,
-            label: AppStrings.phone,
-            readOnly: !canEdit,
-          ),
-          const SizedBox(height: 12),
-          AppTextField(
-            controller: _altPhone,
-            label: AppStrings.altPhone,
-            readOnly: !canEdit,
-          ),
-        ],
-        const SizedBox(height: 12),
-        AppTextField(
-          controller: _workPlace,
-          label: AppStrings.workPlace,
-          readOnly: !canEdit,
-        ),
-        const SizedBox(height: 12),
-        AppTextField(
-          controller: _schoolName,
-          label: AppStrings.schoolName,
-          readOnly: !canEdit,
-        ),
-        if (!widget.profileMode) ...[
-          const SizedBox(height: 16),
-          MemberIncomeSection(
-            familyMemberId: member.id,
-            canEdit: canEdit,
-          ),
-          const SizedBox(height: 12),
-          RecurringIncomeSection(
-            familyMemberId: member.id,
-            householdId: member.householdId,
-            canEdit: canEdit,
-          ),
-        ],
-        const SizedBox(height: 24),
-        Text(
-          AppStrings.clothingSizes,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: 8),
-        AppTextField(
-          controller: _shirtSize,
-          label: AppStrings.shirtSize,
-          readOnly: !canEdit,
-        ),
-        const SizedBox(height: 12),
-        AppTextField(
-          controller: _pantsSize,
-          label: AppStrings.pantsSize,
-          readOnly: !canEdit,
-        ),
-        const SizedBox(height: 12),
-        AppTextField(
-          controller: _shoeSize,
-          label: AppStrings.shoeSize,
-          readOnly: !canEdit,
-        ),
-        if (canEdit) ...[
-          const SizedBox(height: 24),
-          Text(
-            AppStrings.fieldVisibility,
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 4),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text(AppStrings.visibilityPhone),
-            value: _visibility[MemberVisibilityKeys.phone] ?? true,
-            onChanged: (v) => setState(
-              () => _visibility[MemberVisibilityKeys.phone] = v,
-            ),
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text(AppStrings.visibilityHealth),
-            value: _visibility[MemberVisibilityKeys.health] ?? true,
-            onChanged: (v) => setState(
-              () => _visibility[MemberVisibilityKeys.health] = v,
-            ),
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text(AppStrings.visibilityEmergency),
-            value: _visibility[MemberVisibilityKeys.emergency] ?? true,
-            onChanged: (v) => setState(
-              () => _visibility[MemberVisibilityKeys.emergency] = v,
-            ),
-          ),
-        ],
-        if (canEdit) ...[
-          const SizedBox(height: 16),
-          if (_error != null)
-            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          const SizedBox(height: 8),
-          LoadingButton(
-            label: AppStrings.save,
-            isLoading: _saving,
-            onPressed: () => _save(member, details),
-          ),
-        ],
-        if (isSelf && !isOwner && !widget.profileMode) ...[
-          const SizedBox(height: 16),
-          OutlinedButton(
-            onPressed: () => _leave(member.householdId),
-            child: const Text(AppStrings.leaveHousehold),
-          ),
-        ],
-        if (!widget.profileMode && isManager && member.relationship != 'self') ...[
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () => _remove(member),
-            child: Text(
-              AppStrings.removeMember,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _healthTab(
-    FamilyMember member,
-    FamilyMemberDetails? details,
-    bool canEdit,
-  ) {
     final healthPrivate =
         _isSectionPrivate(details, canEdit, MemberVisibilityKeys.health);
+    final emergencyPrivate =
+        _isSectionPrivate(details, canEdit, MemberVisibilityKeys.emergency);
 
-    if (healthPrivate) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [_privateBanner()],
-      );
+    final children = <Widget>[];
+    var addedDetailSection = false;
+
+    void addSection(String title, List<Widget?> rows) {
+      final present = rows.whereType<Widget>().toList();
+      if (present.isEmpty) return;
+      children.add(_sectionTitle(title));
+      children.addAll(present);
+      children.add(const SizedBox(height: 20));
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        AppTextField(
-          controller: _bloodGroup,
-          label: AppStrings.bloodGroup,
-          readOnly: !canEdit,
+    // Header
+    children.add(
+      _header(
+        member: member,
+        details: details,
+        subtitle: widget.profileMode ? email : member.relationshipLabel,
+        membership: widget.profileMode ? null : membership,
+      ),
+    );
+    children.add(const SizedBox(height: 24));
+
+    if (managedByYou) {
+      children.add(
+        Card(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: const Padding(
+            padding: EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Icon(Icons.supervisor_account_outlined),
+                SizedBox(width: 12),
+                Expanded(child: Text(AppStrings.managedByYou)),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 12),
-        AppTextField(
-          controller: _allergies,
-          label: AppStrings.allergies,
-          maxLines: 2,
-          readOnly: !canEdit,
+      );
+      children.add(const SizedBox(height: 16));
+    }
+
+    // Member meta (family members only)
+    if (!widget.profileMode) {
+      addSection(AppStrings.tabOverview, [
+        _valueRow(
+          AppStrings.memberType,
+          member.isAppMember ? AppStrings.appMember : AppStrings.profileOnly,
         ),
-        const SizedBox(height: 12),
-        AppTextField(
-          controller: _medicines,
-          label: AppStrings.medicines,
-          maxLines: 2,
-          readOnly: !canEdit,
-        ),
-        const SizedBox(height: 12),
-        AppTextField(
-          controller: _doctorName,
-          label: AppStrings.doctorName,
-          readOnly: !canEdit,
-        ),
-        const SizedBox(height: 12),
-        AppTextField(
-          controller: _doctorPhone,
-          label: AppStrings.doctorPhone,
-          keyboardType: TextInputType.phone,
-          readOnly: !canEdit,
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          value: _dietaryPreference,
-          decoration: const InputDecoration(labelText: AppStrings.diet),
-          items: const [
-            DropdownMenuItem(value: 'veg', child: Text('Vegetarian')),
-            DropdownMenuItem(value: 'non_veg', child: Text('Non-vegetarian')),
-            DropdownMenuItem(value: 'vegan', child: Text('Vegan')),
-            DropdownMenuItem(value: 'other', child: Text('Other')),
-          ],
-          onChanged: canEdit ? (v) => setState(() => _dietaryPreference = v) : null,
-        ),
-        const SizedBox(height: 12),
-        AppTextField(
-          controller: _foodAllergies,
-          label: AppStrings.foodAllergies,
-          maxLines: 2,
-          readOnly: !canEdit,
-        ),
-        const SizedBox(height: 24),
+        if (membership != null)
+          _valueRow(AppStrings.appRole, roleLabel(membership.role)),
+        if (member.isPendingInvite)
+          _valueRow(AppStrings.status, AppStrings.pendingInvite),
+        if (member.invitedEmail != null)
+          _valueRow(AppStrings.email, member.invitedEmail!),
+      ]);
+    } else if (email != null) {
+      addSection(AppStrings.accountInfo, [
+        _valueRow(AppStrings.email, email),
+      ]);
+    }
+
+    // Contact
+    if (phonePrivate) {
+      addSection(AppStrings.sectionContact, [_privateBanner()]);
+    } else {
+      final contactRows = [
+        _valueRow(AppStrings.phone, details?.phone ?? member.phone),
+        _valueRow(AppStrings.altPhone, details?.altPhone),
+      ];
+      if (contactRows.whereType<Widget>().isNotEmpty) addedDetailSection = true;
+      addSection(AppStrings.sectionContact, contactRows);
+    }
+
+    // Basics
+    final dob = details?.dateOfBirth ?? member.dateOfBirth;
+    final basicsRows = [
+      if (dob != null) _valueRow(AppStrings.dateOfBirth, Formatters.date(dob)),
+      _valueRow(AppStrings.workPlace, details?.workPlace),
+      _valueRow(AppStrings.schoolName, details?.schoolName),
+    ];
+    if (basicsRows.whereType<Widget>().isNotEmpty) addedDetailSection = true;
+    addSection(AppStrings.sectionWorkSchool, basicsRows);
+
+    // Health
+    if (healthPrivate) {
+      addSection(AppStrings.tabHealth, [_privateBanner()]);
+    } else {
+      final healthRows = [
+        _valueRow(AppStrings.bloodGroup, details?.bloodGroup),
+        _valueRow(AppStrings.allergies, details?.allergies),
+        _valueRow(AppStrings.medicines, details?.medicines),
+        _valueRow(AppStrings.doctorName, details?.doctorName),
+        _valueRow(AppStrings.doctorPhone, details?.doctorPhone),
+        _valueRow(AppStrings.diet, _dietLabel(details?.dietaryPreference)),
+        _valueRow(AppStrings.foodAllergies, details?.foodAllergies),
+      ];
+      if (healthRows.whereType<Widget>().isNotEmpty) addedDetailSection = true;
+      addSection(AppStrings.tabHealth, healthRows);
+    }
+
+    // Medicine schedules (family members only)
+    if (!widget.profileMode) {
+      children.add(
         MedicineSchedulesSection(
           familyMemberId: member.id,
           householdId: member.householdId,
           canEdit: canEdit,
         ),
-        if (canEdit) ...[
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ],
-          const SizedBox(height: 16),
-          LoadingButton(
-            label: AppStrings.save,
-            isLoading: _saving,
-            onPressed: () => _save(member, details),
-          ),
-        ],
-      ],
+      );
+      children.add(const SizedBox(height: 20));
+    }
+
+    // Emergency
+    if (emergencyPrivate) {
+      addSection(AppStrings.tabEmergency, [_privateBanner()]);
+    } else {
+      final emergencyRows = [
+        _valueRow(
+          AppStrings.emergencyContactName,
+          details?.emergencyContactName,
+        ),
+        _valueRow(
+          AppStrings.emergencyContactPhone,
+          details?.emergencyContactPhone,
+        ),
+        _valueRow(
+          AppStrings.emergencyContactRelation,
+          details?.emergencyContactRelation,
+        ),
+        _valueRow(AppStrings.notes, details?.notes),
+      ];
+      if (emergencyRows.whereType<Widget>().isNotEmpty) {
+        addedDetailSection = true;
+      }
+      addSection(AppStrings.tabEmergency, emergencyRows);
+    }
+
+    // Clothing sizes
+    final sizeRows = [
+      _valueRow(
+        AppStrings.shirtSize,
+        details?.clothingSizes[ClothingSizeKeys.shirt],
+      ),
+      _valueRow(
+        AppStrings.pantsSize,
+        details?.clothingSizes[ClothingSizeKeys.pants],
+      ),
+      _valueRow(
+        AppStrings.shoeSize,
+        details?.clothingSizes[ClothingSizeKeys.shoes],
+      ),
+    ];
+    if (sizeRows.whereType<Widget>().isNotEmpty) addedDetailSection = true;
+    addSection(AppStrings.clothingSizes, sizeRows);
+
+    // Income (family members only)
+    if (!widget.profileMode) {
+      children.add(
+        MemberIncomeSection(familyMemberId: member.id, canEdit: canEdit),
+      );
+      children.add(const SizedBox(height: 12));
+      children.add(
+        RecurringIncomeSection(
+          familyMemberId: member.id,
+          householdId: member.householdId,
+          canEdit: canEdit,
+        ),
+      );
+      children.add(const SizedBox(height: 20));
+    }
+
+    // Empty hint
+    if (!addedDetailSection && canEdit) {
+      children.add(
+        Text(
+          AppStrings.profileEmptyHint,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+      );
+      children.add(const SizedBox(height: 20));
+    }
+
+    // Management actions (family members only)
+    children.addAll(
+      _managementActions(
+        member: member,
+        membership: membership,
+        isSelf: isSelf,
+        isManager: isManager,
+        isOwner: isOwner,
+        currentUserId: currentUserId,
+      ),
     );
+
+    // Bottom spacing so the FAB doesn't cover content
+    children.add(const SizedBox(height: 80));
+    return children;
   }
 
-  Widget _formTab(
-    FamilyMember member,
-    FamilyMemberDetails? details,
-    List<Widget> fields, {
-    required bool canEdit,
-    required bool isPrivate,
+  List<Widget> _managementActions({
+    required FamilyMember member,
+    required HouseholdMember? membership,
+    required bool isSelf,
+    required bool isManager,
+    required bool isOwner,
+    required String? currentUserId,
   }) {
-    if (isPrivate) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [_privateBanner()],
+    if (widget.profileMode) return const [];
+    final widgets = <Widget>[];
+
+    if (isOwner &&
+        member.isAppMember &&
+        membership != null &&
+        canChangeRole(
+          isOwner: isOwner,
+          targetUserId: member.userId,
+          currentUserId: currentUserId,
+          targetRole: membership.role,
+        )) {
+      widgets.add(
+        Align(
+          alignment: Alignment.centerLeft,
+          child: MemberRoleActions(
+            currentRole: membership.role,
+            onMakeCoOwner: () => _changeRole(member, 'co_owner'),
+            onMakeMember: () => _changeRole(member, 'member'),
+          ),
+        ),
+      );
+      widgets.add(const SizedBox(height: 8));
+    }
+
+    if (isOwner && member.isRosterOnly && !member.isPendingInvite) {
+      widgets.add(
+        Text(
+          AppStrings.coOwnerRequiresApp,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
+        ),
+      );
+      widgets.add(const SizedBox(height: 8));
+    }
+
+    if (isOwner && member.relationship != 'self') {
+      widgets.add(
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => member.isAppMember
+                ? _convertToProfileOnly(member)
+                : _convertToApp(member),
+            icon: Icon(
+              member.isAppMember ? Icons.person_outline : Icons.mail_outline,
+            ),
+            label: Text(
+              member.isAppMember
+                  ? AppStrings.makeProfileOnly
+                  : AppStrings.inviteToApp,
+            ),
+          ),
+        ),
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        ...fields,
-        if (canEdit) ...[
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ],
-          const SizedBox(height: 16),
-          LoadingButton(
-            label: AppStrings.save,
-            isLoading: _saving,
-            onPressed: () => _save(member, details),
+    if (isSelf && !isOwner) {
+      widgets.add(const SizedBox(height: 8));
+      widgets.add(
+        OutlinedButton(
+          onPressed: () => _leave(member.householdId),
+          child: const Text(AppStrings.leaveHousehold),
+        ),
+      );
+    }
+
+    if (isManager && member.relationship != 'self') {
+      widgets.add(const SizedBox(height: 8));
+      widgets.add(
+        TextButton(
+          onPressed: () => _remove(member),
+          child: Text(
+            AppStrings.removeMember,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
+        ),
+      );
+    }
+
+    return widgets;
+  }
+
+  Widget _header({
+    required FamilyMember member,
+    required FamilyMemberDetails? details,
+    required String? subtitle,
+    required HouseholdMember? membership,
+  }) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        children: [
+          MemberAvatarPicker(
+            familyMemberId: member.id,
+            householdId: member.householdId,
+            displayName: member.listLabel,
+            avatarPath: details?.avatarUrl,
+            canEdit: false,
+            existingDetails: details,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            member.listLabel,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          if (subtitle != null && subtitle.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+          if (membership != null) ...[
+            const SizedBox(height: 8),
+            MemberRoleBadge(role: membership.role),
+          ],
         ],
-      ],
+      ),
     );
   }
 
-  Widget _infoRow(String label, String value) {
+  Widget _privateBanner() {
+    return Card(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              Icons.lock_outline,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                AppStrings.sectionPrivate,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+
+  Widget? _valueRow(String label, String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return null;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -918,11 +741,24 @@ class _FamilyMemberDetailScreenState extends ConsumerState<FamilyMemberDetailScr
         children: [
           SizedBox(
             width: 120,
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
-          Expanded(child: Text(value)),
+          Expanded(child: Text(text)),
         ],
       ),
     );
+  }
+
+  String _dietLabel(String? value) {
+    return switch (value) {
+      'veg' => 'Vegetarian',
+      'non_veg' => 'Non-vegetarian',
+      'vegan' => 'Vegan',
+      'other' => 'Other',
+      _ => '',
+    };
   }
 }

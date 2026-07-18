@@ -332,9 +332,10 @@ returns table (
 begin
   return query
   with members as (
-    select id, display_name
-    from public.expense_group_members
-    where group_id = p_group_id
+    -- Qualify + alias so display_name does not clash with RETURNS TABLE out-params.
+    select egm.id, egm.display_name as member_name
+    from public.expense_group_members egm
+    where egm.group_id = p_group_id
   ),
   paid as (
     select paid_by_member_id as member_id, coalesce(sum(amount), 0) as total
@@ -351,13 +352,13 @@ begin
     where e.group_id = p_group_id
     group by s.group_member_id
   ),
-  settled_in as (
+  settled_in_totals as (
     select to_member_id as member_id, coalesce(sum(amount), 0) as total
     from public.expense_settlements
     where group_id = p_group_id
     group by to_member_id
   ),
-  settled_out as (
+  settled_out_totals as (
     select from_member_id as member_id, coalesce(sum(amount), 0) as total
     from public.expense_settlements
     where group_id = p_group_id
@@ -365,7 +366,7 @@ begin
   )
   select
     m.id,
-    m.display_name,
+    m.member_name,
     coalesce(p.total, 0),
     coalesce(o.total, 0),
     coalesce(si.total, 0),
@@ -375,9 +376,9 @@ begin
   from members m
   left join paid p on p.member_id = m.id
   left join owed o on o.member_id = m.id
-  left join settled_in si on si.member_id = m.id
-  left join settled_out so on so.member_id = m.id
-  order by m.display_name;
+  left join settled_in_totals si on si.member_id = m.id
+  left join settled_out_totals so on so.member_id = m.id
+  order by m.member_name;
 end;
 $$ language plpgsql security definer stable;
 

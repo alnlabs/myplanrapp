@@ -1,4 +1,5 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:myplanr/features/expenses/data/expense_date_filter.dart';
+import 'package:myplanr/features/expenses/data/expense_groups_repository.dart';
 import 'package:myplanr/features/expenses/data/expenses_list_provider.dart';
 import 'package:myplanr/features/pantry/data/pantry_items_list_provider.dart';
 import 'package:myplanr/features/plans/data/plans_list_provider.dart';
@@ -27,6 +28,21 @@ class StubExpensesListNotifier extends ExpensesListNotifier {
     int offset,
     int limit,
   ) async {
+    return PaginatedResult(items: items, hasMore: false);
+  }
+}
+
+class StubGroupExpensesListNotifier extends GroupExpensesListNotifier {
+  StubGroupExpensesListNotifier({this.items = const []});
+
+  final List<Expense> items;
+
+  @override
+  PaginatedListState<Expense> build((String, ExpenseDateRange) arg) =>
+      PaginatedListState(items: items);
+
+  @override
+  Future<PaginatedResult<Expense>> fetchPage(int offset, int limit) async {
     return PaginatedResult(items: items, hasMore: false);
   }
 }

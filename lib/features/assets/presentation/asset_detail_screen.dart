@@ -148,8 +148,16 @@ class AssetDetailScreen extends ConsumerWidget {
                       }
                       return Card(
                         child: ListTile(
-                          title: Text(title),
-                          subtitle: Text(parts.join(' · ')),
+                          title: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            parts.join(' · '),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       );
                     }).toList(),

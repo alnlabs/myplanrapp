@@ -213,7 +213,7 @@ class _PantryListTile extends StatelessWidget {
           ),
           title: Text(
             item.name,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.w600,

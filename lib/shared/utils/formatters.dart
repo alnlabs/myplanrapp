@@ -8,6 +8,7 @@ class Formatters {
   static final _currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
   static final _date = DateFormat('d MMM yyyy');
   static final _dateTime = DateFormat('d MMM yyyy, h:mm a');
+  static final _time = DateFormat('h:mm a');
   static final _monthYear = DateFormat('MMMM yyyy');
 
   static String currency(double amount) => _currency.format(amount);
@@ -15,6 +16,8 @@ class Formatters {
   static String date(DateTime value) => _date.format(value);
 
   static String dateTime(DateTime value) => _dateTime.format(value);
+
+  static String time(DateTime value) => _time.format(value);
 
   static String monthYear(DateTime value) => _monthYear.format(value);
 

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_providers.dart';
+import '../../../shared/constants/list_pagination.dart';
 import '../../../shared/models/expense.dart';
 import '../../../shared/models/recurring_money_rule.dart';
 import '../../auth/data/auth_repository.dart';
@@ -27,7 +28,7 @@ class RecurringMoneyRuleRepository {
     if (entryType != null) {
       query = query.eq('entry_type', entryType);
     }
-    final data = await query.order('next_due_date');
+    final data = await query.order('next_due_date').limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => RecurringMoneyRule.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -41,7 +42,8 @@ class RecurringMoneyRuleRepository {
         .select(_select)
         .eq('family_member_id', familyMemberId)
         .eq('entry_type', 'income')
-        .order('next_due_date');
+        .order('next_due_date')
+        .limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => RecurringMoneyRule.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -61,7 +63,7 @@ class RecurringMoneyRuleRepository {
     if (entryType != null) {
       query = query.eq('entry_type', entryType);
     }
-    final data = await query.order('next_due_date');
+    final data = await query.order('next_due_date').limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => RecurringMoneyRule.fromJson(e as Map<String, dynamic>))
         .where((r) => r.isDue)

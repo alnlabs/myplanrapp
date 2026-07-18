@@ -52,6 +52,20 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
   bool _loading = false;
   String? _error;
 
+  bool _recurring = false;
+  String _frequency = 'monthly';
+  late int _dayOfMonth;
+
+  /// New income added from the generic "Add income" flow is always recorded
+  /// for the logged-in user, so we hide the member picker and lock it.
+  bool get _lockToCurrentUser =>
+      !widget.isEditing && widget.initialFamilyMemberId == null;
+
+  /// The recurring option only makes sense when creating a brand-new income
+  /// entry (not when editing or logging an already-due recurring rule).
+  bool get _canOfferRecurring =>
+      !widget.isEditing && widget.recurringRuleId == null;
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +86,27 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
       }
       _familyMemberId = widget.initialFamilyMemberId;
       _categoryId = widget.initialCategoryId;
+    }
+    _dayOfMonth = _date.day;
+  }
+
+  DateTime _nextRecurringDueDate() {
+    switch (_frequency) {
+      case 'weekly':
+        return _date.add(const Duration(days: 7));
+      case 'yearly':
+        return DateTime(_date.year + 1, _date.month, _date.day);
+      case 'monthly':
+      default:
+        var year = _date.year;
+        var month = _date.month + 1;
+        if (month > 12) {
+          month = 1;
+          year++;
+        }
+        final lastDay = DateTime(year, month + 1, 0).day;
+        final day = _dayOfMonth > lastDay ? lastDay : _dayOfMonth;
+        return DateTime(year, month, day);
     }
   }
 
@@ -129,6 +164,21 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
               .advanceRule(widget.recurringRuleId!);
           ref.invalidate(memberRecurringIncomeProvider(_familyMemberId!));
           ref.invalidate(dueRecurringIncomeProvider);
+        } else if (_recurring) {
+          await ref.read(recurringMoneyRuleRepositoryProvider).createIncomeRule(
+                householdId: householdId,
+                familyMemberId: _familyMemberId!,
+                incomeSource: _incomeSource.text.trim(),
+                categoryId: _categoryId!,
+                amount: double.parse(_amount.text.trim()),
+                frequency: _frequency,
+                startDate: _date,
+                nextDueDate: _nextRecurringDueDate(),
+                dayOfMonth: _frequency == 'monthly' ? _dayOfMonth : null,
+                note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+              );
+          ref.invalidate(memberRecurringIncomeProvider(_familyMemberId!));
+          ref.invalidate(dueRecurringIncomeProvider);
         }
       }
 
@@ -154,35 +204,7 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
       body: FormScreenBody(
         formKey: _formKey,
         children: [
-          rosterAsync.when(
-            loading: () => const LinearProgressIndicator(),
-            error: (_, __) => FormAsyncFieldError(
-              message: AppStrings.errorGeneric,
-              onRetry: () => ref.invalidate(familyRosterProvider),
-            ),
-            data: (members) {
-              if (_familyMemberId == null && members.isNotEmpty) {
-                _familyMemberId = widget.initialFamilyMemberId ?? members.first.id;
-              }
-              return DropdownButtonFormField<String>(
-                value: _familyMemberId,
-                decoration:
-                    const InputDecoration(labelText: AppStrings.incomeMember),
-                items: members
-                    .map(
-                      (FamilyMember m) => DropdownMenuItem(
-                        value: m.id,
-                        child: Text(m.listLabel),
-                      ),
-                    )
-                    .toList(),
-                validator: (_) => validateIncomeMemberId(_familyMemberId),
-                onChanged: widget.isEditing
-                    ? null
-                    : (v) => setState(() => _familyMemberId = v),
-              );
-            },
-          ),
+          _buildMemberField(rosterAsync),
           const SizedBox(height: kFormFieldSpacing),
           AppTextField(
             controller: _incomeSource,
@@ -253,6 +275,10 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
             label: AppStrings.note,
             maxLines: 2,
           ),
+          if (_canOfferRecurring) ...[
+            const SizedBox(height: kFormFieldSpacing),
+            _buildRecurringSection(context),
+          ],
           const SizedBox(height: 24),
           FormSaveSection(
             error: _error,
@@ -262,6 +288,117 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMemberField(AsyncValue<List<FamilyMember>> rosterAsync) {
+    if (_lockToCurrentUser) {
+      final currentMemberAsync = ref.watch(currentUserFamilyMemberProvider);
+      final locked = currentMemberAsync.maybeWhen(
+        data: (member) => member,
+        orElse: () => null,
+      );
+      if (locked != null) {
+        _familyMemberId = locked.id;
+        return InputDecorator(
+          decoration: const InputDecoration(
+            labelText: AppStrings.incomeForLabel,
+          ),
+          child: Text('${locked.listLabel} (${AppStrings.you})'),
+        );
+      }
+      if (currentMemberAsync.isLoading) {
+        return const LinearProgressIndicator();
+      }
+      // Fall back to the roster picker if we cannot resolve the current user.
+    }
+
+    return rosterAsync.when(
+      loading: () => const LinearProgressIndicator(),
+      error: (_, __) => FormAsyncFieldError(
+        message: AppStrings.errorGeneric,
+        onRetry: () => ref.invalidate(familyRosterProvider),
+      ),
+      data: (members) {
+        if (_familyMemberId == null && members.isNotEmpty) {
+          _familyMemberId = widget.initialFamilyMemberId ?? members.first.id;
+        }
+        return DropdownButtonFormField<String>(
+          value: _familyMemberId,
+          decoration:
+              const InputDecoration(labelText: AppStrings.incomeMember),
+          items: members
+              .map(
+                (FamilyMember m) => DropdownMenuItem(
+                  value: m.id,
+                  child: Text(m.listLabel),
+                ),
+              )
+              .toList(),
+          validator: (_) => validateIncomeMemberId(_familyMemberId),
+          onChanged: widget.isEditing
+              ? null
+              : (v) => setState(() => _familyMemberId = v),
+        );
+      },
+    );
+  }
+
+  Widget _buildRecurringSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: _recurring,
+          title: const Text(AppStrings.recurringIncomeToggle),
+          subtitle: const Text(AppStrings.recurringIncomeToggleHint),
+          onChanged: (v) => setState(() => _recurring = v),
+        ),
+        if (_recurring) ...[
+          const SizedBox(height: kFormFieldSpacing),
+          DropdownButtonFormField<String>(
+            value: _frequency,
+            decoration:
+                const InputDecoration(labelText: AppStrings.frequencyLabel),
+            items: const [
+              DropdownMenuItem(
+                value: 'monthly',
+                child: Text(AppStrings.frequencyMonthly),
+              ),
+              DropdownMenuItem(
+                value: 'weekly',
+                child: Text(AppStrings.frequencyWeekly),
+              ),
+              DropdownMenuItem(
+                value: 'yearly',
+                child: Text(AppStrings.frequencyYearly),
+              ),
+            ],
+            onChanged: (v) {
+              if (v != null) setState(() => _frequency = v);
+            },
+          ),
+          if (_frequency == 'monthly') ...[
+            const SizedBox(height: kFormFieldSpacing),
+            DropdownButtonFormField<int>(
+              value: _dayOfMonth,
+              decoration:
+                  const InputDecoration(labelText: AppStrings.dayOfMonthLabel),
+              items: List.generate(
+                31,
+                (i) => DropdownMenuItem(
+                  value: i + 1,
+                  child: Text('${i + 1}'),
+                ),
+              ),
+              onChanged: (v) {
+                if (v != null) setState(() => _dayOfMonth = v);
+              },
+            ),
+          ],
+        ],
+      ],
     );
   }
 }

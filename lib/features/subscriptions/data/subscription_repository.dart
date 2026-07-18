@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_providers.dart';
+import '../../../shared/constants/list_pagination.dart';
 import '../../../shared/models/subscription.dart';
 import '../../alerts/services/notification_service.dart';
 import '../../auth/data/auth_repository.dart';
@@ -17,7 +18,8 @@ class SubscriptionRepository {
         .select()
         .eq('household_id', householdId)
         .eq('is_active', true)
-        .order('name');
+        .order('name')
+        .limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => Subscription.fromJson(e as Map<String, dynamic>))
         .toList();

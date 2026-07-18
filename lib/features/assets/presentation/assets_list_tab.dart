@@ -176,7 +176,7 @@ class _AssetListTile extends StatelessWidget {
           ),
           title: Text(
             asset.name,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.w600,

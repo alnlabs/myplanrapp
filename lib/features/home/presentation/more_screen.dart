@@ -6,6 +6,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../shared/constants/nav_features.dart';
 import '../../../shared/utils/shell_navigation.dart';
 import '../../../shared/widgets/secret_tap.dart';
+import '../../auth/data/auth_repository.dart';
 import '../../feedback/presentation/feedback_screen.dart';
 import '../../household/data/household_settings_repository.dart';
 import '../../household/presentation/household_screen.dart';
@@ -64,6 +65,20 @@ class MoreScreen extends ConsumerWidget {
         ),
       ),
     ];
+
+    final isAdmin =
+        ref.watch(userProfileProvider).valueOrNull?.isAdmin ?? false;
+    if (isAdmin) {
+      appItems.add(
+        _MoreTile(
+          icon: Icons.admin_panel_settings_outlined,
+          color: Colors.deepPurple,
+          title: AppStrings.adminTitle,
+          subtitle: AppStrings.moreAdminHint,
+          onTap: () => context.push('/admin'),
+        ),
+      );
+    }
 
     return Scaffold(
       body: CustomScrollView(

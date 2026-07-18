@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,6 +7,9 @@ import '../../features/auth/presentation/account_restore_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
+import '../../features/admin/data/admin_gate_provider.dart';
+import '../../features/admin/presentation/admin_dashboard_screen.dart';
+import '../../features/admin/presentation/admin_otp_screen.dart';
 import '../../features/expenses/presentation/add_recurring_expense_screen.dart';
 import '../../features/expenses/presentation/expense_group_detail_screen.dart';
 import '../../features/expenses/presentation/expense_group_form_screen.dart';
@@ -32,15 +36,23 @@ import '../../features/subscriptions/presentation/subscriptions_screen.dart';
 import '../providers/supabase_providers.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
-  final onboardingAsync = ref.watch(onboardingCompletedProvider);
-  final profileAsync = ref.watch(userProfileProvider);
+  // Keep a single GoRouter alive for the whole app session and merely *refresh*
+  // it when auth/profile/gate state changes. Recreating the router on every auth
+  // event (e.g. the token refresh triggered by admin OTP verification) tears
+  // down the navigation stack and remounts screens, which caused the admin gate
+  // to re-send its OTP in a loop.
+  final refresh = _RouterRefresh(ref);
+  ref.onDispose(refresh.dispose);
 
   return GoRouter(
     initialLocation: '/onboarding',
+    refreshListenable: refresh,
     redirect: (context, state) {
-      final onboardingDone = onboardingAsync.valueOrNull ?? false;
-      final session = authState.valueOrNull?.session;
+      final onboardingDone =
+          ref.read(onboardingCompletedProvider).valueOrNull ?? false;
+      final session = ref.read(authStateProvider).valueOrNull?.session;
+      final profileAsync = ref.read(userProfileProvider);
+      final adminVerified = ref.read(adminGateProvider).verified;
       final path = state.matchedLocation;
 
       // Reminders merged into the To-do tab.
@@ -49,14 +61,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/plans?filter=$filter';
       }
 
+      // While a password reset is completing, the recovery session briefly signs
+      // the user in. Stay put so they can finish setting the new password.
+      if (ref.read(passwordResetInProgressProvider)) return null;
+
       final isOnboarding = path == '/onboarding';
       final isAuthRoute =
-          path == '/login' ||
-          path == '/register' ||
-          path == '/forgot-password';
+          path == '/login' || path == '/register' || path == '/forgot-password';
       final isHouseholdSetup =
           path == '/household-setup' || path.startsWith('/setup-wizard');
       final isAccountRestore = path == '/account-restore';
+      final isAdminGate = path == '/admin';
+      final isAdminHome = path == '/admin/home';
+      final isAdminRoute = isAdminGate || isAdminHome;
 
       // On the onboarding screen, only leave once it's been completed.
       // We never force other routes back to onboarding (avoids redirect
@@ -67,7 +84,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         final profile = profileAsync.valueOrNull;
         if (profile?.isPendingDeletion == true) return '/account-restore';
         if (profile != null && !profile.hasHousehold) {
-          return '/household-setup';
+          // Admin-only accounts don't need a household; send them to the
+          // dedicated admin area instead of household setup.
+          return profile.isAdmin ? '/admin' : '/household-setup';
         }
         return '/home';
       }
@@ -78,24 +97,37 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       final profile = profileAsync.valueOrNull;
+      final isAdmin = profile?.isAdmin ?? false;
 
       // Soft-deleted account still within grace period: must restore or sign out.
       if (profile?.isPendingDeletion == true && !isAccountRestore) {
         return '/account-restore';
       }
 
+      // Non-admins can never sit on the admin route.
+      if (isAdminRoute && profile != null && !isAdmin) {
+        return profile.hasHousehold ? '/home' : '/household-setup';
+      }
+
+      // The admin dashboard is only reachable after the OTP step-up succeeds;
+      // otherwise fall back to the gate. Conversely, once verified, skip the
+      // gate and go straight to the dashboard.
+      if (isAdminHome && !adminVerified) return '/admin';
+      if (isAdminGate && adminVerified) return '/admin/home';
+
       // Signed in but sitting on an auth route: move into the app.
       if (isAuthRoute) {
         if (profile != null && !profile.hasHousehold) {
-          return '/household-setup';
+          return isAdmin ? '/admin' : '/household-setup';
         }
         return '/home';
       }
 
-      // Signed in with no family: force family creation first.
-      if (!isHouseholdSetup && !isAccountRestore) {
+      // Signed in with no family: force family creation first. Admin-only
+      // accounts (no household) go straight to the admin area instead.
+      if (!isHouseholdSetup && !isAccountRestore && !isAdminRoute) {
         if (profile != null && !profile.hasHousehold) {
-          return '/household-setup';
+          return isAdmin ? '/admin' : '/household-setup';
         }
       }
       return null;
@@ -118,6 +150,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/household-setup',
         builder: (_, __) => const HouseholdSetupScreen(),
+      ),
+      GoRoute(
+        path: '/admin',
+        builder: (_, __) => const AdminOtpScreen(),
+      ),
+      GoRoute(
+        path: '/admin/home',
+        builder: (_, __) => const AdminDashboardScreen(),
       ),
       GoRoute(
         path: '/pantry/add',
@@ -278,3 +318,18 @@ final householdGateProvider = FutureProvider<bool>((ref) async {
   final profile = await ref.watch(userProfileProvider.future);
   return profile?.hasHousehold ?? false;
 });
+
+/// Bridges Riverpod state changes into a [Listenable] so a single [GoRouter]
+/// instance can be *refreshed* (re-run its redirect) instead of recreated.
+///
+/// The [ref.listen] subscriptions are automatically closed when the owning
+/// provider is disposed, so this only needs to forward change events.
+class _RouterRefresh extends ChangeNotifier {
+  _RouterRefresh(Ref ref) {
+    ref.listen(authStateProvider, (_, __) => notifyListeners());
+    ref.listen(onboardingCompletedProvider, (_, __) => notifyListeners());
+    ref.listen(userProfileProvider, (_, __) => notifyListeners());
+    ref.listen(adminGateProvider, (_, __) => notifyListeners());
+    ref.listen(passwordResetInProgressProvider, (_, __) => notifyListeners());
+  }
+}

@@ -213,9 +213,15 @@ class RecurringIncomeSection extends ConsumerWidget {
                   children: rules.map((rule) {
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(rule.displayLabel),
+                      title: Text(
+                        rule.displayLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       subtitle: Text(
                         '${AppStrings.nextDue}: ${Formatters.date(rule.nextDueDate)} · ${Formatters.currency(rule.amount)}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       trailing: canEdit
                           ? IconButton(

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_providers.dart';
 import '../../../core/strings/app_strings.dart';
+import '../../../shared/models/user_profile.dart';
+import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/async_screen_body.dart';
-import '../../../shared/widgets/loading_button.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../household/data/family_repository.dart';
 import '../../household/presentation/family_member_detail_screen.dart';
@@ -44,42 +44,57 @@ class _BasicProfileScreen extends ConsumerStatefulWidget {
   const _BasicProfileScreen();
 
   @override
-  ConsumerState<_BasicProfileScreen> createState() => _BasicProfileScreenState();
+  ConsumerState<_BasicProfileScreen> createState() =>
+      _BasicProfileScreenState();
 }
 
 class _BasicProfileScreenState extends ConsumerState<_BasicProfileScreen> {
-  final _nameController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-  bool _loading = false;
-  bool _loaded = false;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
-
-  void _loadName(String? name) {
-    if (_loaded || name == null) return;
-    _nameController.text = name;
-    _loaded = true;
-  }
-
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
+  Future<void> _editName(String? current) async {
+    final controller = TextEditingController(text: current ?? '');
+    final formKey = GlobalKey<FormState>();
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(AppStrings.editProfile),
+        content: Form(
+          key: formKey,
+          child: AppTextField(
+            controller: controller,
+            label: AppStrings.displayName,
+            validator: Validators.required,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(AppStrings.cancel),
+          ),
+          TextButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogContext, controller.text.trim());
+              }
+            },
+            child: const Text(AppStrings.save),
+          ),
+        ],
+      ),
+    );
+    if (saved == null) return;
     try {
-      await ref
-          .read(authRepositoryProvider)
-          .updateDisplayName(_nameController.text.trim());
+      await ref.read(authRepositoryProvider).updateDisplayName(saved);
       ref.invalidate(userProfileProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(AppStrings.saved)),
         );
       }
-    } finally {
-      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ApiErrorFormatter.format(e))),
+        );
+      }
     }
   }
 
@@ -87,58 +102,106 @@ class _BasicProfileScreenState extends ConsumerState<_BasicProfileScreen> {
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileProvider);
     final email = ref.watch(supabaseClientProvider).auth.currentUser?.email;
-
-    profileAsync.whenData((profile) => _loadName(profile?.displayName));
+    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text(AppStrings.profileTitle)),
+      appBar: AppBar(
+        title: const Text(AppStrings.profileTitle),
+        actions: [
+          IconButton(
+            onPressed: () =>
+                _editName(profileAsync.valueOrNull?.displayName),
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: AppStrings.editProfile,
+          ),
+        ],
+      ),
       body: AsyncScreenBody(
         value: profileAsync,
         onRetry: () => ref.invalidate(userProfileProvider),
-        builder: (profile) {
+        builder: (UserProfile? profile) {
+          final name = profile?.displayName?.trim();
+          final initial = (name != null && name.isNotEmpty)
+              ? name[0].toUpperCase()
+              : '?';
           return ListView(
             padding: const EdgeInsets.all(24),
             children: [
-              Text(
-                AppStrings.accountInfo,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 12),
-              if (email != null)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.email_outlined),
-                  title: const Text(AppStrings.email),
-                  subtitle: Text(email),
+              Center(
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 40,
+                      backgroundColor: theme.colorScheme.primaryContainer,
+                      child: Text(
+                        initial,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      name?.isNotEmpty == true ? name! : AppStrings.notSet,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (email != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        email,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
                 ),
-              const SizedBox(height: 8),
-              Form(
-                key: _formKey,
-                child: AppTextField(
-                  controller: _nameController,
-                  label: AppStrings.displayName,
-                  validator: Validators.required,
-                ),
               ),
-              const SizedBox(height: 16),
-              LoadingButton(
-                label: AppStrings.save,
-                isLoading: _loading,
-                onPressed: _save,
+              const SizedBox(height: 32),
+              OutlinedButton.icon(
+                onPressed: () => _editName(name),
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text(AppStrings.editProfile),
               ),
               const SizedBox(height: 24),
-              Text(
-                AppStrings.profileDetailsHint,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                AppStrings.noHousehold,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
+              Card(
+                color: theme.colorScheme.surfaceContainerHighest,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.groups_outlined,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              AppStrings.profileDetailsHint,
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              AppStrings.noHousehold,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.outline,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           );

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_providers.dart';
+import '../../../shared/constants/list_pagination.dart';
 import '../../../shared/constants/pantry_availability.dart';
 import '../../../shared/models/shopping_list_item.dart';
 
@@ -16,7 +17,8 @@ class ShoppingRepository {
         .select()
         .eq('household_id', householdId)
         .eq('is_checked', false)
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false)
+        .limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => ShoppingListItem.fromJson(e as Map<String, dynamic>))
         .toList();

@@ -5,6 +5,7 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../core/logging/app_logger.dart';
+import '../../../shared/constants/reminder_repeat.dart';
 import '../data/notification_alert_type.dart';
 import '../data/notification_sound_settings.dart';
 
@@ -310,9 +311,17 @@ class NotificationService {
     required String title,
     required String body,
     required DateTime reminderAt,
+    String repeat = ReminderRepeat.none,
   }) async {
-    final scheduled = tz.TZDateTime.from(reminderAt.toLocal(), tz.local);
-    if (scheduled.isBefore(tz.TZDateTime.now(tz.local))) return;
+    final recurring = ReminderRepeat.isRecurring(repeat);
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime.from(reminderAt.toLocal(), tz.local);
+    if (scheduled.isBefore(now)) {
+      // One-time reminders in the past are dropped; recurring ones roll forward
+      // to their next occurrence so the OS has a valid future anchor.
+      if (!recurring) return;
+      scheduled = _advanceToFuture(scheduled, now, repeat);
+    }
 
     await _zonedSchedule(
       id: _notificationId('rem_$reminderId'),
@@ -325,7 +334,40 @@ class NotificationService {
         priority: Priority.high,
         iosSubtitle: body,
       ),
+      matchDateTimeComponents: _repeatComponents(repeat),
     );
+  }
+
+  DateTimeComponents? _repeatComponents(String repeat) => switch (repeat) {
+        ReminderRepeat.daily => DateTimeComponents.time,
+        ReminderRepeat.weekly => DateTimeComponents.dayOfWeekAndTime,
+        ReminderRepeat.monthly => DateTimeComponents.dayOfMonthAndTime,
+        ReminderRepeat.yearly => DateTimeComponents.dateAndTime,
+        _ => null,
+      };
+
+  tz.TZDateTime _advanceToFuture(
+    tz.TZDateTime start,
+    tz.TZDateTime now,
+    String repeat,
+  ) {
+    var next = start;
+    var guard = 0;
+    while (!next.isAfter(now) && guard < 1000) {
+      next = switch (repeat) {
+        ReminderRepeat.daily => next.add(const Duration(days: 1)),
+        ReminderRepeat.weekly => next.add(const Duration(days: 7)),
+        ReminderRepeat.monthly => tz.TZDateTime(
+            tz.local, next.year, next.month + 1, next.day, next.hour,
+            next.minute),
+        ReminderRepeat.yearly => tz.TZDateTime(
+            tz.local, next.year + 1, next.month, next.day, next.hour,
+            next.minute),
+        _ => next.add(const Duration(days: 1)),
+      };
+      guard++;
+    }
+    return next;
   }
 
   Future<void> cancelStandaloneReminder(String reminderId) async {

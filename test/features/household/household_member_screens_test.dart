@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myplanr/core/strings/app_strings.dart';
-import 'package:myplanr/features/household/data/household_repository.dart';
+import 'package:myplanr/features/expenses/data/expense_repository.dart';
+import 'package:myplanr/features/expenses/data/recurring_money_rule_repository.dart';
 import 'package:myplanr/features/household/data/family_repository.dart';
+import 'package:myplanr/features/household/data/household_repository.dart';
+import 'package:myplanr/features/household/data/medicine_schedule_repository.dart';
 import 'package:myplanr/features/household/presentation/family_member_detail_screen.dart';
 import 'package:myplanr/features/household/presentation/household_screen.dart';
 
@@ -35,7 +38,7 @@ void main() {
   });
 
   group('FamilyMemberDetailScreen widget', () {
-    testWidgets('renders member tabs and overview', (tester) async {
+    testWidgets('renders member header and read-only details', (tester) async {
       await pumpTestApp(
         tester,
         overrides: [
@@ -46,14 +49,18 @@ void main() {
               .overrideWith((ref) async => testFamilyMemberDetails),
           householdMembersProvider.overrideWith((ref) async => []),
           activeHouseholdProvider.overrideWith((ref) async => testHousehold),
+          memberIncomeSourceSummaryProvider(memberId)
+              .overrideWith((ref) async => []),
+          memberRecurringIncomeProvider(memberId)
+              .overrideWith((ref) async => []),
+          medicineSchedulesProvider(memberId).overrideWith((ref) async => []),
         ],
         child: const FamilyMemberDetailScreen(memberId: memberId),
       );
 
       expect(find.textContaining('Alex'), findsWidgets);
-      expect(find.text(AppStrings.tabOverview), findsOneWidget);
-      expect(find.text(AppStrings.tabHealth), findsOneWidget);
-      expect(find.text(AppStrings.tabEmergency), findsOneWidget);
+      expect(find.text(AppStrings.sectionContact), findsOneWidget);
+      expect(find.text('9876543210'), findsOneWidget);
     });
   });
 }

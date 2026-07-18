@@ -2,12 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_providers.dart';
+import '../../../shared/constants/list_pagination.dart';
 import '../../../shared/constants/plan_constants.dart';
+import '../../../shared/constants/reminder_repeat.dart';
 import '../../../shared/models/app_reminder_item.dart';
 import '../../../shared/models/medicine_schedule.dart';
 import '../../../shared/models/plan.dart';
 import '../../../shared/models/standalone_reminder.dart';
 import '../../../shared/models/subscription.dart';
+import '../../../shared/utils/formatters.dart';
 import '../../../shared/utils/schedule_time_parser.dart';
 import '../../alerts/services/notification_service.dart';
 import '../../auth/data/auth_repository.dart';
@@ -47,7 +50,8 @@ class ReminderRepository {
         .eq('household_id', householdId)
         .eq('user_id', userId)
         .eq('is_active', true)
-        .order('reminder_at');
+        .order('reminder_at')
+        .limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => StandaloneReminder.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -65,6 +69,7 @@ class ReminderRepository {
     required String title,
     String? notes,
     required DateTime reminderAt,
+    String repeat = ReminderRepeat.none,
   }) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Not signed in');
@@ -77,6 +82,7 @@ class ReminderRepository {
       notes: notes?.trim().isEmpty ?? true ? null : notes!.trim(),
       reminderAt: reminderAt,
       isActive: true,
+      repeat: ReminderRepeat.normalize(repeat),
     );
 
     final data = await _client
@@ -238,13 +244,19 @@ class ReminderRepository {
     await NotificationService.instance.cancelStandaloneReminder(reminder.id);
 
     if (!reminder.isActive) return;
-    if (!reminder.reminderAt.isAfter(DateTime.now())) return;
+    // Recurring reminders may have an anchor in the past; the notification
+    // service rolls them forward to the next occurrence.
+    if (!reminder.isRecurring &&
+        !reminder.reminderAt.isAfter(DateTime.now())) {
+      return;
+    }
 
     await NotificationService.instance.scheduleStandaloneReminder(
       reminderId: reminder.id,
       title: reminder.title,
       body: reminder.notes ?? reminder.title,
       reminderAt: reminder.reminderAt,
+      repeat: reminder.repeat,
     );
   }
 
@@ -263,6 +275,11 @@ class ReminderRepository {
             subtitle: AppReminderLabels.standalone,
             notes: r.notes,
             reminderAt: r.reminderAt,
+            isRepeating: r.isRecurring,
+            timeLabel: r.isRecurring
+                ? '${ReminderRepeat.repeatsLabel(r.repeat)} · '
+                    '${Formatters.time(r.reminderAt.toLocal())}'
+                : null,
           ),
         )
         .toList();

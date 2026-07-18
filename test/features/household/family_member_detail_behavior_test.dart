@@ -7,7 +7,7 @@ import 'package:myplanr/features/expenses/data/recurring_money_rule_repository.d
 import 'package:myplanr/features/household/data/family_repository.dart';
 import 'package:myplanr/features/household/data/household_repository.dart';
 import 'package:myplanr/features/household/data/medicine_schedule_repository.dart';
-import 'package:myplanr/features/household/presentation/family_member_detail_screen.dart';
+import 'package:myplanr/features/household/presentation/family_member_edit_screen.dart';
 import 'package:myplanr/shared/models/family_member.dart';
 import 'package:myplanr/shared/models/household.dart';
 
@@ -49,13 +49,13 @@ void main() {
     familyRepo = StubFamilyRepository();
   });
 
-  group('FamilyMemberDetailScreen behavior', () {
-    testWidgets('overview tab edits all contact and clothing fields then saves',
+  group('FamilyMemberEditScreen behavior', () {
+    testWidgets('edits all contact and clothing fields then saves',
         (tester) async {
       await pumpTestApp(
         tester,
         overrides: detailOverrides(),
-        child: const FamilyMemberDetailScreen(memberId: memberId),
+        child: const FamilyMemberEditScreen(memberId: memberId),
       );
 
       await enterTextByLabel(tester, AppStrings.phone, '9000000001');
@@ -96,16 +96,13 @@ void main() {
       );
     });
 
-    testWidgets('health tab edits medical fields and diet then saves',
+    testWidgets('edits medical fields and diet then saves',
         (tester) async {
       await pumpTestApp(
         tester,
         overrides: detailOverrides(),
-        child: const FamilyMemberDetailScreen(memberId: memberId),
+        child: const FamilyMemberEditScreen(memberId: memberId),
       );
-
-      await tester.tap(find.text(AppStrings.tabHealth));
-      await tester.pumpAndSettle();
 
       await enterTextByLabel(tester, AppStrings.bloodGroup, 'A+');
       await enterTextByLabel(tester, AppStrings.allergies, 'Pollen');
@@ -114,6 +111,7 @@ void main() {
       await enterTextByLabel(tester, AppStrings.doctorPhone, '9111111111');
       await enterTextByLabel(tester, AppStrings.foodAllergies, 'Peanuts');
 
+      await tester.ensureVisible(find.byType(DropdownButtonFormField<String>));
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Vegetarian').last);
@@ -131,16 +129,13 @@ void main() {
       expect(familyRepo.lastUpsertedDetails?.dietaryPreference, 'veg');
     });
 
-    testWidgets('emergency tab edits all emergency fields then saves',
+    testWidgets('edits all emergency fields then saves',
         (tester) async {
       await pumpTestApp(
         tester,
         overrides: detailOverrides(),
-        child: const FamilyMemberDetailScreen(memberId: memberId),
+        child: const FamilyMemberEditScreen(memberId: memberId),
       );
-
-      await tester.tap(find.text(AppStrings.tabEmergency));
-      await tester.pumpAndSettle();
 
       await enterTextByLabel(
         tester,
@@ -171,21 +166,17 @@ void main() {
       expect(familyRepo.lastUpsertedDetails?.notes, 'Call after 6pm');
     });
 
-    testWidgets('switching tabs preserves unsaved overview field values',
+    testWidgets('shows contact and health fields together without tabs',
         (tester) async {
       await pumpTestApp(
         tester,
         overrides: detailOverrides(),
-        child: const FamilyMemberDetailScreen(memberId: memberId),
+        child: const FamilyMemberEditScreen(memberId: memberId),
       );
 
       await enterTextByLabel(tester, AppStrings.workPlace, 'Remote Office');
-      await tester.tap(find.text(AppStrings.tabHealth));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(AppStrings.tabOverview));
-      await tester.pumpAndSettle();
-
       expect(find.text('Remote Office'), findsOneWidget);
+      expect(find.byType(TabBar), findsNothing);
     });
   });
 }

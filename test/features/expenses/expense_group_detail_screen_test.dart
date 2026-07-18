@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myplanr/core/strings/app_strings.dart';
@@ -7,7 +6,6 @@ import 'package:myplanr/features/expenses/data/expense_date_filter_provider.dart
 import 'package:myplanr/features/expenses/data/expense_groups_repository.dart';
 import 'package:myplanr/features/expenses/data/expenses_list_provider.dart';
 import 'package:myplanr/features/expenses/presentation/expense_group_detail_screen.dart';
-import 'package:myplanr/shared/models/expense.dart';
 import 'package:myplanr/shared/models/expense_group.dart';
 import '../../helpers/pump_app.dart';
 import '../../helpers/stub_notifiers.dart';
@@ -15,7 +13,7 @@ import '../../helpers/test_fixtures.dart';
 
 void main() {
   const groupId = 'group-shared-1';
-  final testRange = ExpenseDateFilter().rangeFor();
+  final testRange = const ExpenseDateFilter().rangeFor();
 
   List<Override> sharedOverrides(ExpenseGroup group) {
     return [
@@ -38,13 +36,15 @@ void main() {
       ),
       expenseGroupBalancesProvider(groupId)
           .overrideWith((ref) async => testSettlementBalances),
-      expenseGroupExpensesProvider((groupId, testRange))
-          .overrideWith((ref) async => [testGroupExpense]),
+      expenseGroupExpensesProvider.overrideWith(
+        () => StubGroupExpensesListNotifier(items: [testGroupExpense]),
+      ),
     ];
   }
 
   group('ExpenseGroupDetailScreen widget', () {
-    testWidgets('renders shared group with balances and expenses', (tester) async {
+    testWidgets('renders shared group with balances and expenses',
+        (tester) async {
       await pumpTestApp(
         tester,
         overrides: sharedOverrides(testSharedExpenseGroup),
@@ -80,8 +80,8 @@ void main() {
             ],
           ),
           expenseGroupBalancesProvider(groupId).overrideWith((ref) async => []),
-          expenseGroupExpensesProvider((groupId, testRange))
-              .overrideWith((ref) async => []),
+          expenseGroupExpensesProvider
+              .overrideWith(StubGroupExpensesListNotifier.new),
         ],
         child: const ExpenseGroupDetailScreen(groupId: groupId),
       );

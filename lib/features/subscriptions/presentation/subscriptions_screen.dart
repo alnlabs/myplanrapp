@@ -12,6 +12,7 @@ import '../../../shared/widgets/compact_grid_card.dart';
 import '../../../shared/widgets/list_grid_layout.dart';
 import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../../../shared/widgets/list_display_mode_toggle.dart';
+import '../../../shared/widgets/value_text.dart';
 import '../data/subscription_repository.dart';
 
 class SubscriptionsScreen extends ConsumerWidget {
@@ -225,10 +226,9 @@ class _Metric extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(
+          ValueText(
             value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            alignment: Alignment.center,
             style: theme.textTheme.titleMedium?.copyWith(
               color: theme.colorScheme.onPrimary,
               fontWeight: FontWeight.w700,
@@ -237,6 +237,9 @@ class _Metric extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: theme.textTheme.labelSmall?.copyWith(
               color: theme.colorScheme.onPrimary.withOpacity(0.8),
             ),
@@ -302,7 +305,7 @@ class _SubscriptionTile extends StatelessWidget {
                     Text(
                       subscription.name,
                       style: theme.textTheme.titleMedium,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
@@ -357,10 +360,13 @@ class _SubscriptionTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   if (subscription.amount != null)
-                    Text(
-                      Formatters.currency(subscription.amount!),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 130),
+                      child: ValueText(
+                        Formatters.currency(subscription.amount!),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   const SizedBox(height: 4),

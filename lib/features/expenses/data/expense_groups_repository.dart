@@ -2,9 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_providers.dart';
+import '../../../shared/constants/list_pagination.dart';
 import '../../../shared/models/expense.dart';
 import '../../../shared/models/expense_group.dart';
 import '../../../shared/models/expense_split.dart';
+import '../../../shared/models/paginated_result.dart';
+import '../../../shared/providers/family_paginated_list_notifier.dart';
+import '../../../shared/providers/paginated_list_state.dart';
+import '../../../shared/utils/paginated_page_parser.dart';
 import '../../auth/data/auth_repository.dart';
 import 'expense_date_filter.dart';
 
@@ -18,7 +23,8 @@ class ExpenseGroupsRepository {
         .from('expense_groups')
         .select('*, expense_group_members(id)')
         .eq('household_id', householdId)
-        .order('name');
+        .order('name')
+        .limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => ExpenseGroup.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -107,8 +113,10 @@ class ExpenseGroupsRepository {
     });
   }
 
-  Future<List<Expense>> fetchGroupExpenses(
+  Future<PaginatedResult<Expense>> fetchGroupExpensesPage(
     String groupId, {
+    required int offset,
+    required int limit,
     DateTime? startDate,
     DateTime? endDate,
   }) async {
@@ -127,10 +135,15 @@ class ExpenseGroupsRepository {
       query = query.lte('expense_date', ExpenseDateRange.toIsoDate(endDate));
     }
     final data = await query
-        .order('expense_date', ascending: false);
-    return (data as List)
-        .map((e) => Expense.fromJson(e as Map<String, dynamic>))
-        .toList();
+        .order('expense_date', ascending: false)
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit);
+    final parsed = parsePaginatedPage(
+      data,
+      limit,
+      (json) => Expense.fromJson(json),
+    );
+    return PaginatedResult(items: parsed.items, hasMore: parsed.hasMore);
   }
 
   Future<List<ExpenseSplit>> fetchExpenseSplits(String expenseId) async {
@@ -178,22 +191,33 @@ final expenseGroupProvider =
 });
 
 final expenseGroupMembersProvider =
-    FutureProvider.family<List<ExpenseGroupMember>, String>((ref, groupId) async {
+    FutureProvider.family<List<ExpenseGroupMember>, String>(
+        (ref, groupId) async {
   return ref.watch(expenseGroupsRepositoryProvider).fetchMembers(groupId);
 });
 
 final expenseGroupBalancesProvider =
-    FutureProvider.family<List<ExpenseGroupBalance>, String>((ref, groupId) async {
+    FutureProvider.family<List<ExpenseGroupBalance>, String>(
+        (ref, groupId) async {
   return ref.watch(expenseGroupsRepositoryProvider).fetchBalances(groupId);
 });
 
-final expenseGroupExpensesProvider = FutureProvider.family<
-    List<Expense>,
-    (String, ExpenseDateRange)>((ref, key) async {
-  final (groupId, range) = key;
-  return ref.read(expenseGroupsRepositoryProvider).fetchGroupExpenses(
-        groupId,
-        startDate: range.start,
-        endDate: range.end,
-      );
-});
+class GroupExpensesListNotifier
+    extends FamilyPaginatedListNotifier<Expense, (String, ExpenseDateRange)> {
+  @override
+  Future<PaginatedResult<Expense>> fetchPage(int offset, int limit) {
+    final (groupId, range) = arg;
+    return ref.read(expenseGroupsRepositoryProvider).fetchGroupExpensesPage(
+          groupId,
+          offset: offset,
+          limit: limit,
+          startDate: range.start,
+          endDate: range.end,
+        );
+  }
+}
+
+final expenseGroupExpensesProvider = NotifierProvider.family<
+    GroupExpensesListNotifier,
+    PaginatedListState<Expense>,
+    (String, ExpenseDateRange)>(GroupExpensesListNotifier.new);

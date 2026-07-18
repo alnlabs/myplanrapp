@@ -98,7 +98,7 @@ void main() {
       expect(find.textContaining('Alexandersoningtonovich'), findsWidgets);
     });
 
-    testWidgets('family member detail tabs avoid overflow with long values',
+    testWidgets('family member detail avoids overflow with long values',
         (tester) async {
       useNarrowPhoneViewport(tester);
 
@@ -138,11 +138,10 @@ void main() {
           child: const FamilyMemberDetailScreen(memberId: memberId),
         );
 
-        await tester.tap(find.text(AppStrings.tabEmergency));
         await tester.pumpAndSettle();
       });
 
-      expect(find.text(AppStrings.tabEmergency), findsOneWidget);
+      expect(find.byType(FamilyMemberDetailScreen), findsOneWidget);
     });
 
     testWidgets('expenses list avoids overflow with long titles and amounts',

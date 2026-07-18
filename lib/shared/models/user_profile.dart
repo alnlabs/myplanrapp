@@ -7,6 +7,7 @@ class UserProfile {
     this.username,
     this.activeHouseholdId,
     this.deletedAt,
+    this.isAdmin = false,
   });
 
   static const deletionGracePeriod = Duration(days: 30);
@@ -16,6 +17,7 @@ class UserProfile {
   final String? username;
   final String? activeHouseholdId;
   final DateTime? deletedAt;
+  final bool isAdmin;
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
@@ -26,6 +28,7 @@ class UserProfile {
       deletedAt: json['deleted_at'] != null
           ? DateTime.parse(json['deleted_at'] as String)
           : null,
+      isAdmin: json['is_admin'] as bool? ?? false,
     );
   }
 

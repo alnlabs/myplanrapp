@@ -21,8 +21,10 @@ import '../../../shared/widgets/list_display_mode_toggle.dart';
 import '../../../shared/widgets/compact_grid_card.dart';
 import '../../../shared/widgets/list_grid_layout.dart';
 import '../../../shared/widgets/paginated_list_footer.dart';
+import '../../../shared/widgets/value_text.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../household/data/family_repository.dart';
+import '../data/expense_date_filter.dart';
 import '../data/expense_date_filter_provider.dart';
 import '../data/expense_groups_repository.dart';
 import '../data/expense_repository.dart';
@@ -34,7 +36,6 @@ import '../utils/expense_period_label.dart';
 import '../utils/money_report_export.dart';
 import 'add_expense_screen.dart';
 import 'add_income_screen.dart';
-import 'expense_period_filter_bar.dart';
 import 'expense_summary_screen.dart';
 
 class ExpensesScreen extends ConsumerStatefulWidget {
@@ -55,7 +56,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     final count = await processAutoLogRecurringExpenses(ref);
     if (count > 0 && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.recurringLogged)),
+        const SnackBar(content: Text(AppStrings.recurringLogged)),
       );
     }
   }
@@ -78,22 +79,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         subtitle: AppStrings.expensesSubtitle,
         actions: [
           IconButton(
-            onPressed: () => context.push('/expenses/recurring'),
-            icon: const Icon(Icons.event_repeat_outlined),
-            tooltip: AppStrings.recurringExpenses,
-          ),
-          IconButton(
-            onPressed: () => context.push('/expenses/groups'),
-            icon: const Icon(Icons.groups_outlined),
-            tooltip: AppStrings.expenseGroupsTitle,
-          ),
-          IconButton(
-            onPressed: () => _exportReport(context, ref),
-            icon: const Icon(Icons.ios_share_outlined),
-            tooltip: AppStrings.exportReport,
-          ),
-          const ListDisplayModeToggle(screenKey: ListDisplayModeKeys.expenses),
-          IconButton(
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const ExpenseSummaryScreen(),
@@ -101,6 +86,46 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
             ),
             icon: const Icon(Icons.bar_chart_outlined),
             tooltip: AppStrings.summaryTitle,
+          ),
+          const ListDisplayModeToggle(screenKey: ListDisplayModeKeys.expenses),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: AppStrings.moreActions,
+            onSelected: (value) {
+              if (value == 'recurring') {
+                context.push('/expenses/recurring');
+              } else if (value == 'groups') {
+                context.push('/expenses/groups');
+              } else if (value == 'export') {
+                _exportReport(context, ref);
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem<String>(
+                value: 'recurring',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.event_repeat_outlined),
+                  title: Text(AppStrings.recurringExpenses),
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'groups',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.groups_outlined),
+                  title: Text(AppStrings.expenseGroupsTitle),
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'export',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.ios_share_outlined),
+                  title: Text(AppStrings.exportReport),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -174,6 +199,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   Future<void> _showAddMenu(BuildContext context, WidgetRef ref) async {
     final choice = await showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -201,6 +227,124 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       ),
     );
     if (updated == true) await refreshExpensesData(ref);
+  }
+
+  int _activeFilterCount(MoneyListFilterState filters) {
+    var count = 0;
+    if (filters.typeFilter != MoneyListFilter.all) count++;
+    if (filters.familyMemberId != null) count++;
+    if (filters.groupId != null) count++;
+    return count;
+  }
+
+  Future<void> _showPeriodSheet(BuildContext context, WidgetRef ref) async {
+    final current = ref.read(expenseDateFilterProvider).preset;
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        Widget tile(ExpenseDatePreset preset, String label, IconData icon) {
+          return ListTile(
+            leading: Icon(icon),
+            title: Text(label),
+            trailing: current == preset
+                ? Icon(
+                    Icons.check,
+                    color: Theme.of(sheetContext).colorScheme.primary,
+                  )
+                : null,
+            onTap: () async {
+              Navigator.pop(sheetContext);
+              if (preset == ExpenseDatePreset.custom) {
+                await _pickCustomRange(context, ref);
+              } else {
+                ref.read(expenseDateFilterProvider.notifier).setPreset(preset);
+                await ref.read(expensesListProvider.notifier).refresh();
+              }
+            },
+          );
+        }
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                child: Text(
+                  AppStrings.moneyPeriodLabel,
+                  style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+              tile(
+                ExpenseDatePreset.today,
+                AppStrings.periodToday,
+                Icons.today_outlined,
+              ),
+              tile(
+                ExpenseDatePreset.week,
+                AppStrings.periodThisWeek,
+                Icons.date_range_outlined,
+              ),
+              tile(
+                ExpenseDatePreset.month,
+                AppStrings.periodThisMonth,
+                Icons.calendar_month_outlined,
+              ),
+              tile(
+                ExpenseDatePreset.custom,
+                AppStrings.periodCustomRange,
+                Icons.edit_calendar_outlined,
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickCustomRange(BuildContext context, WidgetRef ref) async {
+    final filter = ref.read(expenseDateFilterProvider);
+    final now = DateTime.now();
+    final initialStart = filter.customStart ?? DateTime(now.year, now.month, 1);
+    final initialEnd = filter.customEnd ?? now;
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: now.add(const Duration(days: 365)),
+      initialDateRange: DateTimeRange(start: initialStart, end: initialEnd),
+    );
+    if (picked == null) return;
+
+    final error = filter.customRangeError(picked.start, picked.end);
+    if (error != null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error)));
+      }
+      return;
+    }
+
+    ref
+        .read(expenseDateFilterProvider.notifier)
+        .setCustomRange(picked.start, picked.end);
+    await ref.read(expensesListProvider.notifier).refresh();
+  }
+
+  Future<void> _showFilterSheet(BuildContext context, WidgetRef ref) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => const _ExpenseFilterSheet(),
+    );
   }
 
   Future<void> _logDueRecurringExpense(
@@ -302,27 +446,71 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       );
     }
 
+    final periodLabel =
+        expensePeriodLabel(ref.watch(expenseDateFilterProvider));
+    final activeFilterCount = _activeFilterCount(filters);
+
+    final currentUserId = ref.watch(currentUserIdProvider);
+    String? currentMemberId;
+    if (currentUserId != null) {
+      final roster = ref.watch(familyRosterProvider).valueOrNull;
+      if (roster != null) {
+        for (final member in roster) {
+          if (member.userId == currentUserId) {
+            currentMemberId = member.id;
+            break;
+          }
+        }
+      }
+    }
+
     final header = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const ExpensePeriodFilterBar(),
-        const SizedBox(height: 12),
-        _MoneyFilterBar(
-          filters: filters,
-          onTypeChanged: (filter) {
-            ref.read(moneyListFilterProvider.notifier).setTypeFilter(filter);
-            ref.read(expensesListProvider.notifier).refresh();
-          },
-          onMemberChanged: (memberId) {
-            ref.read(moneyListFilterProvider.notifier).setFamilyMemberId(memberId);
-            ref.read(expensesListProvider.notifier).refresh();
-          },
-          onGroupChanged: (groupId) {
-            ref.read(moneyListFilterProvider.notifier).setGroupId(groupId);
-            ref.read(expensesListProvider.notifier).refresh();
-          },
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _showPeriodSheet(context, ref),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        periodLabel,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Icon(Icons.arrow_drop_down),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: () => _showFilterSheet(context, ref),
+              icon: const Icon(Icons.tune, size: 18),
+              label: Text(
+                activeFilterCount > 0
+                    ? '${AppStrings.filterList} ($activeFilterCount)'
+                    : AppStrings.filterList,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
+        moneySummaryAsync.when(
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+          data: (summary) => _MoneySummaryCard(
+            summary: summary,
+            memberIncome: memberIncomeAsync.valueOrNull ?? const [],
+            periodLabel: expensePeriodLabel(ref.watch(expenseDateFilterProvider)),
+            currentMemberId: currentMemberId,
+          ),
+        ),
+        const SizedBox(height: 16),
         dueIncomeAsync.when(
           loading: () => const SizedBox.shrink(),
           error: (_, __) => const SizedBox.shrink(),
@@ -336,6 +524,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                 title: const Text(AppStrings.recurringIncomeDue),
                 subtitle: Text(
                   '${rule.displayLabel} · ${Formatters.currency(rule.amount)}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 trailing: TextButton(
                   onPressed: () async {
@@ -386,6 +576,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                                   ),
                                   Text(
                                     '${rule.displayLabel} · ${Formatters.currency(rule.amount)}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -422,16 +614,31 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
             );
           },
         ),
-        moneySummaryAsync.when(
-          loading: () => const SizedBox.shrink(),
-          error: (_, __) => const SizedBox.shrink(),
-          data: (summary) => _MoneySummaryCard(
-            summary: summary,
-            memberIncome: memberIncomeAsync.valueOrNull ?? const [],
-            periodLabel: expensePeriodLabel(ref.watch(expenseDateFilterProvider)),
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                AppStrings.transactionsTitle,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            if (activeFilterCount > 0)
+              TextButton.icon(
+                onPressed: () {
+                  ref
+                      .read(moneyListFilterProvider.notifier)
+                      .setTypeFilter(MoneyListFilter.all);
+                  ref.read(moneyListFilterProvider.notifier).setGroupId(null);
+                  ref.read(expensesListProvider.notifier).refresh();
+                },
+                icon: const Icon(Icons.close, size: 16),
+                label: const Text(AppStrings.clearFilters),
+              ),
+          ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 8),
       ],
     );
 
@@ -491,108 +698,168 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   }
 }
 
-class _MoneyFilterBar extends ConsumerWidget {
-  const _MoneyFilterBar({
-    required this.filters,
-    required this.onTypeChanged,
-    required this.onMemberChanged,
-    required this.onGroupChanged,
-  });
-
-  final MoneyListFilterState filters;
-  final ValueChanged<MoneyListFilter> onTypeChanged;
-  final ValueChanged<String?> onMemberChanged;
-  final ValueChanged<String?> onGroupChanged;
+class _ExpenseFilterSheet extends ConsumerWidget {
+  const _ExpenseFilterSheet();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final filters = ref.watch(moneyListFilterProvider);
     final rosterAsync = ref.watch(familyRosterProvider);
     final groupsAsync = ref.watch(expenseGroupsProvider);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 8,
+
+    void refresh() => ref.read(expensesListProvider.notifier).refresh();
+
+    void setType(MoneyListFilter filter) {
+      ref.read(moneyListFilterProvider.notifier).setTypeFilter(filter);
+      refresh();
+    }
+
+    void setMember(String? id) {
+      ref.read(moneyListFilterProvider.notifier).setFamilyMemberId(id);
+      refresh();
+    }
+
+    void setGroup(String? id) {
+      ref.read(moneyListFilterProvider.notifier).setGroupId(id);
+      refresh();
+    }
+
+    final hasActive = filters.typeFilter != MoneyListFilter.all ||
+        filters.familyMemberId != null ||
+        filters.groupId != null;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ChoiceChip(
-              label: const Text(AppStrings.filterAllMoney),
-              selected: filters.typeFilter == MoneyListFilter.all,
-              onSelected: (_) => onTypeChanged(MoneyListFilter.all),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    AppStrings.filterList,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: hasActive
+                      ? () {
+                          ref
+                              .read(moneyListFilterProvider.notifier)
+                              .setTypeFilter(MoneyListFilter.all);
+                          ref
+                              .read(moneyListFilterProvider.notifier)
+                              .setGroupId(null);
+                          refresh();
+                        }
+                      : null,
+                  child: const Text(AppStrings.clearFilters),
+                ),
+              ],
             ),
-            ChoiceChip(
-              label: const Text(AppStrings.filterExpensesOnly),
-              selected: filters.typeFilter == MoneyListFilter.expenses,
-              onSelected: (_) => onTypeChanged(MoneyListFilter.expenses),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<MoneyListFilter>(
+                showSelectedIcon: false,
+                style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                segments: const [
+                  ButtonSegment(
+                    value: MoneyListFilter.all,
+                    label: Text(AppStrings.filterAllMoney),
+                  ),
+                  ButtonSegment(
+                    value: MoneyListFilter.expenses,
+                    label: Text(AppStrings.filterExpensesOnly),
+                  ),
+                  ButtonSegment(
+                    value: MoneyListFilter.income,
+                    label: Text(AppStrings.filterIncomeOnly),
+                  ),
+                ],
+                selected: {filters.typeFilter},
+                onSelectionChanged: (selection) => setType(selection.first),
+              ),
             ),
-            ChoiceChip(
-              label: const Text(AppStrings.filterIncomeOnly),
-              selected: filters.typeFilter == MoneyListFilter.income,
-              onSelected: (_) => onTypeChanged(MoneyListFilter.income),
+            if (filters.typeFilter == MoneyListFilter.income)
+              rosterAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (members) {
+                  if (members.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: DropdownButtonFormField<String?>(
+                      value: filters.familyMemberId,
+                      decoration: const InputDecoration(
+                        labelText: AppStrings.filterByMember,
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text(AppStrings.filterAllMoney),
+                        ),
+                        ...members.map(
+                          (FamilyMember m) => DropdownMenuItem<String?>(
+                            value: m.id,
+                            child: Text(m.listLabel),
+                          ),
+                        ),
+                      ],
+                      onChanged: setMember,
+                    ),
+                  );
+                },
+              ),
+            groupsAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (groups) {
+                if (groups.isEmpty) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: DropdownButtonFormField<String?>(
+                    value: filters.groupId,
+                    decoration: const InputDecoration(
+                      labelText: AppStrings.expenseGroup,
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(AppStrings.filterAllMoney),
+                      ),
+                      ...groups.map(
+                        (g) => DropdownMenuItem<String?>(
+                          value: g.id,
+                          child: Text(g.name),
+                        ),
+                      ),
+                    ],
+                    onChanged: setGroup,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text(AppStrings.doneLabel),
+              ),
             ),
           ],
         ),
-        if (filters.typeFilter == MoneyListFilter.income)
-          rosterAsync.when(
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (members) {
-              if (members.isEmpty) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: DropdownButtonFormField<String?>(
-                  value: filters.familyMemberId,
-                  decoration: const InputDecoration(
-                    labelText: AppStrings.filterByMember,
-                    isDense: true,
-                  ),
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text(AppStrings.filterAllMoney),
-                    ),
-                    ...members.map(
-                      (FamilyMember m) => DropdownMenuItem<String?>(
-                        value: m.id,
-                        child: Text(m.listLabel),
-                      ),
-                    ),
-                  ],
-                  onChanged: onMemberChanged,
-                ),
-              );
-            },
-          ),
-        groupsAsync.when(
-          loading: () => const SizedBox.shrink(),
-          error: (_, __) => const SizedBox.shrink(),
-          data: (groups) {
-            if (groups.isEmpty) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: DropdownButtonFormField<String?>(
-                value: filters.groupId,
-                decoration: const InputDecoration(
-                  labelText: AppStrings.expenseGroup,
-                  isDense: true,
-                ),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text(AppStrings.filterAllMoney),
-                  ),
-                  ...groups.map(
-                    (g) => DropdownMenuItem<String?>(
-                      value: g.id,
-                      child: Text(g.name),
-                    ),
-                  ),
-                ],
-                onChanged: onGroupChanged,
-              ),
-            );
-          },
-        ),
-      ],
+      ),
     );
   }
 }
@@ -602,11 +869,13 @@ class _MoneySummaryCard extends StatefulWidget {
     required this.summary,
     required this.memberIncome,
     required this.periodLabel,
+    this.currentMemberId,
   });
 
   final MoneySummary summary;
   final List<MemberIncomeSummary> memberIncome;
   final String periodLabel;
+  final String? currentMemberId;
 
   @override
   State<_MoneySummaryCard> createState() => _MoneySummaryCardState();
@@ -618,9 +887,11 @@ class _MoneySummaryCardState extends State<_MoneySummaryCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final netColor = widget.summary.netAmount >= 0
-        ? theme.colorScheme.tertiary
-        : theme.colorScheme.error;
+    // High-contrast tints that stay readable on the teal gradient card.
+    const positiveColor = Color(0xFFB9F6CA);
+    const negativeColor = Color(0xFFFFB4AB);
+    final netColor =
+        widget.summary.netAmount >= 0 ? positiveColor : negativeColor;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -645,30 +916,36 @@ class _MoneySummaryCardState extends State<_MoneySummaryCard> {
                   children: [
                     Text(
                       widget.periodLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelLarge?.copyWith(
-                        color: theme.colorScheme.onPrimary.withOpacity(0.85),
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    AppStrings.moneyNet,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onPrimary.withOpacity(0.8),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      AppStrings.moneyNet,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onPrimary.withOpacity(0.9),
+                      ),
                     ),
-                  ),
-                  Text(
-                    Formatters.currency(widget.summary.netAmount),
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: netColor.withOpacity(0.95),
-                      fontWeight: FontWeight.w700,
+                    ValueText(
+                      Formatters.currency(widget.summary.netAmount),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: netColor,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -679,12 +956,14 @@ class _MoneySummaryCardState extends State<_MoneySummaryCard> {
                 child: _MoneyStat(
                   label: AppStrings.moneySpent,
                   amount: widget.summary.totalSpent,
+                  amountColor: negativeColor,
                 ),
               ),
               Expanded(
                 child: _MoneyStat(
                   label: AppStrings.moneyEarned,
                   amount: widget.summary.totalEarned,
+                  amountColor: positiveColor,
                 ),
               ),
             ],
@@ -718,17 +997,24 @@ class _MoneySummaryCardState extends State<_MoneySummaryCard> {
                     children: [
                       Expanded(
                         child: Text(
-                          row.memberName,
+                          row.familyMemberId == widget.currentMemberId
+                              ? AppStrings.me
+                              : row.memberName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onPrimary.withOpacity(0.85),
+                            color: theme.colorScheme.onPrimary.withOpacity(0.95),
                           ),
                         ),
                       ),
-                      Text(
-                        Formatters.currency(row.earnedTotal),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onPrimary,
-                          fontWeight: FontWeight.w600,
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: ValueText(
+                          Formatters.currency(row.earnedTotal),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -743,10 +1029,15 @@ class _MoneySummaryCardState extends State<_MoneySummaryCard> {
 }
 
 class _MoneyStat extends StatelessWidget {
-  const _MoneyStat({required this.label, required this.amount});
+  const _MoneyStat({
+    required this.label,
+    required this.amount,
+    this.amountColor,
+  });
 
   final String label;
   final double amount;
+  final Color? amountColor;
 
   @override
   Widget build(BuildContext context) {
@@ -756,15 +1047,18 @@ class _MoneyStat extends StatelessWidget {
       children: [
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onPrimary.withOpacity(0.75),
+            color: theme.colorScheme.onPrimary.withOpacity(0.9),
           ),
         ),
-        Text(
+        ValueText(
           Formatters.currency(amount),
+          alignment: Alignment.centerLeft,
           style: theme.textTheme.titleMedium?.copyWith(
-            color: theme.colorScheme.onPrimary,
-            fontWeight: FontWeight.w600,
+            color: amountColor ?? theme.colorScheme.onPrimary,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
@@ -892,6 +1186,19 @@ class _ExpenseList extends ConsumerWidget {
     final memberNames = ref.watch(memberNamesProvider);
     final theme = Theme.of(context);
 
+    String? currentMemberId;
+    if (currentUserId != null) {
+      final roster = ref.watch(familyRosterProvider).valueOrNull;
+      if (roster != null) {
+        for (final member in roster) {
+          if (member.userId == currentUserId) {
+            currentMemberId = member.id;
+            break;
+          }
+        }
+      }
+    }
+
     final grouped = <String, List<Expense>>{};
     for (final expense in expenses) {
       final key = Formatters.date(expense.expenseDate);
@@ -921,10 +1228,13 @@ class _ExpenseList extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  Text(
-                    Formatters.currency(dayTotal.abs()),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: ValueText(
+                      Formatters.currency(dayTotal.abs()),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
@@ -936,44 +1246,46 @@ class _ExpenseList extends ConsumerWidget {
                 currentUserId: currentUserId,
                 isOwner: isOwner,
               );
-              final creatorName = expense.createdBy != null
-                  ? memberNames[expense.createdBy]
-                  : null;
               final isIncome = expense.isIncome;
+              // Show "Me" for the logged-in user, names for everyone else.
+              final creatorName = expense.createdBy != null
+                  ? (expense.createdBy == currentUserId
+                      ? AppStrings.me
+                      : memberNames[expense.createdBy])
+                  : null;
+              final earnerName = expense.familyMemberName == null
+                  ? null
+                  : (currentMemberId != null &&
+                          expense.familyMemberId == currentMemberId
+                      ? AppStrings.me
+                      : expense.familyMemberName);
+              final metaParts = <String>[];
+              void addMeta(String? value) {
+                if (value == null || value.isEmpty) return;
+                if (value == expense.title) return;
+                if (metaParts.contains(value)) return;
+                metaParts.add(value);
+              }
+
+              addMeta(expense.categoryName);
+              addMeta(expense.groupName);
+              if (isIncome) {
+                addMeta(earnerName);
+                if (expense.displaySource != expense.title) {
+                  addMeta(expense.displaySource);
+                }
+              }
+              // Skip "Added by" when the logger is the same person already
+              // shown as the income earner (avoids "X · Added by X").
+              final hideAddedBy = isIncome && creatorName == earnerName;
+              if (creatorName != null && !hideAddedBy) {
+                addMeta(AppStrings.addedBy(creatorName));
+              }
+              final meta = metaParts.join(' · ');
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    child: Icon(
-                      isIncome
-                          ? Icons.savings_outlined
-                          : Icons.receipt_long_outlined,
-                      color: isIncome
-                          ? theme.colorScheme.tertiary
-                          : theme.colorScheme.onSurfaceVariant,
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(expense.title),
-                  subtitle: Text(
-                    [
-                      if (expense.categoryName != null) expense.categoryName!,
-                      if (expense.groupName != null) expense.groupName!,
-                      if (isIncome && expense.familyMemberName != null)
-                        expense.familyMemberName!,
-                      if (isIncome && expense.displaySource != expense.title)
-                        expense.displaySource,
-                      if (creatorName != null) AppStrings.addedBy(creatorName),
-                    ].join(' · '),
-                  ),
-                  trailing: Text(
-                    '${isIncome ? '+' : ''}${Formatters.currency(expense.amount)}',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: isIncome ? theme.colorScheme.tertiary : null,
-                    ),
-                  ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
                   onTap: canEdit
                       ? () => _openEntry(
                             context,
@@ -995,6 +1307,68 @@ class _ExpenseList extends ConsumerWidget {
                           onExpenseChanged();
                         }
                       : null,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor:
+                              theme.colorScheme.surfaceContainerHighest,
+                          child: Icon(
+                            isIncome
+                                ? Icons.savings_outlined
+                                : Icons.receipt_long_outlined,
+                            color: isIncome
+                                ? theme.colorScheme.tertiary
+                                : theme.colorScheme.onSurfaceVariant,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                expense.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              ValueText(
+                                '${isIncome ? '+' : ''}'
+                                '${Formatters.currency(expense.amount)}',
+                                alignment: Alignment.centerLeft,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: isIncome
+                                      ? theme.colorScheme.tertiary
+                                      : theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              if (meta.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  meta,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               );
             }),

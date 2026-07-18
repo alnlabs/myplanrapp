@@ -5,10 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/models/expense.dart';
 import '../../../shared/utils/formatters.dart';
-import '../data/expense_date_filter.dart';
 import '../../../shared/widgets/async_screen_body.dart';
 import '../data/expense_date_filter_provider.dart';
 import '../data/expense_groups_repository.dart';
+import '../../../shared/providers/paginated_list_state.dart';
+import '../../../shared/widgets/paginated_list_footer.dart';
 import 'expense_period_filter_bar.dart';
 
 class ExpenseGroupDetailScreen extends ConsumerWidget {
@@ -22,7 +23,7 @@ class ExpenseGroupDetailScreen extends ConsumerWidget {
     final membersAsync = ref.watch(expenseGroupMembersProvider(groupId));
     final balancesAsync = ref.watch(expenseGroupBalancesProvider(groupId));
     final range = ref.watch(expenseDateRangeProvider);
-    final expensesAsync =
+    final expensesState =
         ref.watch(expenseGroupExpensesProvider((groupId, range)));
 
     return Scaffold(
@@ -53,95 +54,130 @@ class ExpenseGroupDetailScreen extends ConsumerWidget {
               ref.invalidate(expenseGroupProvider(groupId));
               ref.invalidate(expenseGroupMembersProvider(groupId));
               ref.invalidate(expenseGroupBalancesProvider(groupId));
-              ref.invalidate(expenseGroupExpensesProvider((groupId, range)));
+              await ref
+                  .read(expenseGroupExpensesProvider((groupId, range)).notifier)
+                  .refresh();
             },
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Text(
-                  group.isShared
-                      ? AppStrings.groupTypeShared
-                      : AppStrings.groupTypeOrganizational,
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 12),
-                const ExpensePeriodFilterBar(),
-                const SizedBox(height: 16),
-                if (group.isShared)
-                  balancesAsync.when(
-                    loading: () => const LinearProgressIndicator(),
-                    error: (_, __) => const SizedBox.shrink(),
-                    data: (balances) => Card(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text(
-                              AppStrings.netBalance,
-                              style: Theme.of(context).textTheme.titleSmall,
+            child: PaginatedScrollListener(
+              onLoadMore: () => ref
+                  .read(expenseGroupExpensesProvider((groupId, range)).notifier)
+                  .loadMore(),
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Text(
+                    group.isShared
+                        ? AppStrings.groupTypeShared
+                        : AppStrings.groupTypeOrganizational,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 12),
+                  const ExpensePeriodFilterBar(),
+                  const SizedBox(height: 16),
+                  if (group.isShared)
+                    balancesAsync.when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, __) => const SizedBox.shrink(),
+                      data: (balances) => Card(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                AppStrings.netBalance,
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
                             ),
-                          ),
-                          ...balances.map(
-                            (b) => ListTile(
-                              title: Text(b.displayName),
-                              trailing: Text(
-                                Formatters.currency(b.netBalance),
-                                style: TextStyle(
-                                  color: b.netBalance >= 0
-                                      ? Theme.of(context).colorScheme.tertiary
-                                      : Theme.of(context).colorScheme.error,
-                                  fontWeight: FontWeight.w600,
+                            ...balances.map(
+                              (b) => ListTile(
+                                title: Text(
+                                  b.displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: Text(
+                                  Formatters.currency(b.netBalance),
+                                  style: TextStyle(
+                                    color: b.netBalance >= 0
+                                        ? Theme.of(context).colorScheme.tertiary
+                                        : Theme.of(context).colorScheme.error,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
+                  const SizedBox(height: 12),
+                  membersAsync.when(
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (members) => Text(
+                      '${AppStrings.groupMembers}: ${members.map((m) => m.displayName).join(', ')}',
+                    ),
                   ),
-                const SizedBox(height: 12),
-                membersAsync.when(
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
-                  data: (members) => Text(
-                    '${AppStrings.groupMembers}: ${members.map((m) => m.displayName).join(', ')}',
+                  const SizedBox(height: 16),
+                  _GroupExpensesSection(state: expensesState),
+                  PaginatedListFooter(
+                    state: expensesState,
+                    onRetryLoadMore: () => ref
+                        .read(expenseGroupExpensesProvider((groupId, range))
+                            .notifier)
+                        .loadMore(),
                   ),
-                ),
-                const SizedBox(height: 16),
-                expensesAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (_, __) => const SizedBox.shrink(),
-                  data: (expenses) {
-                    if (expenses.isEmpty) {
-                      return const Text(AppStrings.emptyExpenses);
-                    }
-                    return Column(
-                      children: expenses
-                          .map(
-                            (e) => Card(
-                              child: ListTile(
-                                title: Text(e.title),
-                                subtitle: Text(
-                                  [
-                                    Formatters.date(e.expenseDate),
-                                    if (e.paidByMemberName != null)
-                                      '${AppStrings.paidByMember}: ${e.paidByMemberName}',
-                                  ].join(' · '),
-                                ),
-                                trailing: Text(Formatters.currency(e.amount)),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    );
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },
       ),
+    );
+  }
+}
+
+class _GroupExpensesSection extends StatelessWidget {
+  const _GroupExpensesSection({required this.state});
+
+  final PaginatedListState<Expense> state;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.isInitialLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (state.hasError) {
+      return const SizedBox.shrink();
+    }
+    if (state.items.isEmpty) {
+      return const Text(AppStrings.emptyExpenses);
+    }
+    return Column(
+      children: state.items
+          .map(
+            (e) => Card(
+              child: ListTile(
+                title: Text(
+                  e.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  [
+                    Formatters.date(e.expenseDate),
+                    if (e.paidByMemberName != null)
+                      '${AppStrings.paidByMember}: ${e.paidByMemberName}',
+                  ].join(' · '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: Text(Formatters.currency(e.amount)),
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 }

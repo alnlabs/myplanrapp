@@ -41,11 +41,17 @@ class RecurringExpensesScreen extends ConsumerWidget {
                 leading: Icon(
                   rule.isActive ? Icons.event_repeat : Icons.pause_circle_outline,
                 ),
-                title: Text(rule.title),
+                title: Text(
+                  rule.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 subtitle: Text(
                   '${AppStrings.nextDue}: ${Formatters.date(rule.nextDueDate)} · '
                   '${Formatters.currency(rule.amount)}'
                   '${rule.autoLog ? ' · auto' : ''}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 trailing: IconButton(
                   icon: Icon(rule.isActive ? Icons.pause : Icons.play_arrow),

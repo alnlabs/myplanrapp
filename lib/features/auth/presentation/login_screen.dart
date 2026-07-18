@@ -11,6 +11,7 @@ import '../../../shared/widgets/loading_button.dart';
 import '../../../shared/widgets/myplanr_logo.dart';
 import '../../../shared/widgets/secret_tap.dart';
 import '../data/auth_repository.dart';
+import '../data/credential_store.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -24,7 +25,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _loading = false;
+  bool _rememberMe = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final creds = await ref.read(credentialStoreProvider).read();
+    if (!mounted || creds == null) return;
+    setState(() {
+      _email.text = creds.identifier;
+      _password.text = creds.password;
+      _rememberMe = true;
+    });
+  }
 
   @override
   void dispose() {
@@ -44,6 +62,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             _email.text.trim(),
             _password.text,
           );
+      final credentialStore = ref.read(credentialStoreProvider);
+      if (_rememberMe) {
+        await credentialStore.save(
+          identifier: _email.text.trim(),
+          password: _password.text,
+        );
+      } else {
+        await credentialStore.clear();
+      }
       ref.invalidate(userProfileProvider);
       try {
         final profile =
@@ -96,6 +123,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   label: AppStrings.password,
                   validator: Validators.password,
                   textInputAction: TextInputAction.done,
+                ),
+                const SizedBox(height: 4),
+                CheckboxListTile(
+                  value: _rememberMe,
+                  onChanged: (value) =>
+                      setState(() => _rememberMe = value ?? false),
+                  title: const Text(AppStrings.rememberMe),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),

@@ -37,7 +37,8 @@ abstract final class AppStrings {
   static const settingsNotifications = 'Reminders & alerts';
   static const settingsNotificationsHint =
       'Plan and subscription reminders on this device';
-  static const settingsRequestNotificationPermission = 'Allow reminders on this device';
+  static const settingsRequestNotificationPermission =
+      'Allow reminders on this device';
   static const settingsNotificationPermissionGranted =
       'Reminder permissions enabled';
   static const settingsNotificationPermissionDenied =
@@ -74,7 +75,8 @@ abstract final class AppStrings {
   static const notificationSoundDeviceDefault = 'Device default';
   static const notificationSoundSaved = 'Alert sound updated';
   static const notificationSoundReset = 'Reset to device default';
-  static const notificationSoundsSystemSettings = 'Android notification settings';
+  static const notificationSoundsSystemSettings =
+      'Android notification settings';
   static const notificationSoundsSystemSettingsHint =
       'Fine-tune sounds and importance per channel in system settings';
   static const settingsDiagnosticLogs = 'Diagnostic logs';
@@ -154,8 +156,7 @@ abstract final class AppStrings {
   // Alerts
   static const alertsTitle = 'Low stock';
   static const emptyAlerts = 'All stocked up';
-  static const emptyAlertsHint =
-      'Items below your alert level will show here';
+  static const emptyAlertsHint = 'Items below your alert level will show here';
   static const addToShopList = 'Add to shop list';
 
   // Expenses
@@ -195,6 +196,12 @@ abstract final class AppStrings {
   static const moneyEarned = 'Earned';
   static const moneyNet = 'Net';
   static const earnedByMember = 'Earned by member';
+  static const moneyPeriodLabel = 'Period';
+  static const transactionsTitle = 'Transactions';
+  static const filterList = 'Filter';
+  static const clearFilters = 'Clear';
+  static const doneLabel = 'Done';
+  static const moreActions = 'More';
   static const exportReport = 'Export report';
   static const reportCopied = 'Report copied to clipboard';
   static const emptyIncome = 'No income logged yet';
@@ -209,6 +216,12 @@ abstract final class AppStrings {
   static const frequencyMonthly = 'Monthly';
   static const frequencyWeekly = 'Weekly';
   static const frequencyYearly = 'Yearly';
+  static const frequencyLabel = 'Frequency';
+  static const dayOfMonthLabel = 'Day of month';
+  static const recurringIncomeToggle = 'Repeat this income automatically';
+  static const recurringIncomeToggleHint =
+      'We\'ll set up a recurring income so you don\'t have to add it again';
+  static const incomeForLabel = 'Income for';
   static const pauseRecurring = 'Pause';
   static const resumeRecurring = 'Resume';
   static const periodToday = 'Today';
@@ -216,8 +229,7 @@ abstract final class AppStrings {
   static const periodThisMonth = 'This month';
   static const periodCustom = 'Custom';
   static const periodCustomRange = 'Custom range';
-  static const periodCustomInvalid =
-      'Choose a valid date range (max 366 days)';
+  static const periodCustomInvalid = 'Choose a valid date range (max 366 days)';
   static const emptyExport = 'Nothing to export in this period';
   static const shareReport = 'Share report';
   static const copyReport = 'Copy to clipboard';
@@ -250,8 +262,7 @@ abstract final class AppStrings {
       'Create groups to track shared trips, roommates, or categories';
   static const settlementFrom = 'From';
   static const settlementTo = 'To';
-  static const sharedGroupMinMembers =
-      'Shared groups need at least 2 members';
+  static const sharedGroupMinMembers = 'Shared groups need at least 2 members';
   static const splitSumMismatch = 'Split amounts must equal the expense total';
   static const recurringExpenses = 'Recurring expenses';
   static const addRecurringExpense = 'Add recurring expense';
@@ -282,7 +293,8 @@ abstract final class AppStrings {
   static const addToShop = 'Add to list';
   static const markBought = 'Mark as bought';
   static const emptyShop = 'Shop list is empty';
-  static const emptyShopHint = 'Low-stock pantry items are added here automatically';
+  static const emptyShopHint =
+      'Low-stock pantry items are added here automatically';
   static const sourceLowStock = 'Low stock';
   static const sourceMealPlan = 'Meal plan';
   static const sourceManual = 'Added manually';
@@ -313,7 +325,8 @@ abstract final class AppStrings {
   static const addMember = 'Add member';
   static const inviteToApp = 'Invite to app';
   static const profileOnly = 'Profile only';
-  static const inviteToAppHint = 'They will get an email invite to join on their phone.';
+  static const inviteToAppHint =
+      'They will get an email invite to join on their phone.';
   static const profileOnlyHint =
       'Track plans, health, and reminders for them — notifications go to you.';
   static const relationship = 'Relationship';
@@ -326,7 +339,8 @@ abstract final class AppStrings {
   static const changeMemberType = 'Change type';
   static const makeProfileOnly = 'Make profile only';
   static const inviteToAppTitle = 'Invite to app';
-  static const inviteToAppEmailHint = 'Enter their email to send an app invite.';
+  static const inviteToAppEmailHint =
+      'Enter their email to send an app invite.';
   static const makeProfileOnlyConfirm =
       'Remove their app access and keep them as a profile-only member? Their saved details are kept.';
   static const memberTypeChanged = 'Member type updated';
@@ -348,8 +362,10 @@ abstract final class AppStrings {
   static const inviteRevoked = 'Invite revoked';
   static const noPendingInvites = 'No pending invites.';
   static const you = 'You';
+  static const me = 'Me';
   static const emptyFamilyRoster = 'No family members yet.';
-  static const emptyFamilyRosterHint = 'Add people you manage or invite them to use the app.';
+  static const emptyFamilyRosterHint =
+      'Add people you manage or invite them to use the app.';
   static const familyMemberCount = 'family members';
   static const managedByYou = 'Managed by you';
   static const tabOverview = 'Overview';
@@ -395,7 +411,8 @@ abstract final class AppStrings {
   static const medicineForOther = 'Specify condition';
   static const medicineBrandOptional = 'Brand or formula name (optional)';
   static const medicineBrandHint = 'e.g. Telmisartan, Crocin';
-  static const medicineForRequired = 'Choose or enter what this medicine is for';
+  static const medicineForRequired =
+      'Choose or enter what this medicine is for';
   static const medicineName = 'Medicine name';
   static const dosage = 'Dosage';
   static const timesPerDay = 'Times per day';
@@ -422,8 +439,12 @@ abstract final class AppStrings {
       'Your account is scheduled for permanent deletion on $date. Tap below to keep it.';
   static const accountRestoreKeep = 'Keep my account';
   static const signIn = 'Sign in';
+  static const rememberMe = 'Remember me on this device';
   static const signUp = 'Create account';
   static const signOut = 'Sign out';
+  static const signOutConfirmTitle = 'Sign out?';
+  static const signOutConfirmBody =
+      'You will need to sign in again to access your household.';
   static const email = 'Email';
   static const password = 'Password';
   static const confirmPassword = 'Confirm password';
@@ -432,12 +453,19 @@ abstract final class AppStrings {
   static const hidePassword = 'Hide password';
   static const displayName = 'Display name';
   static const username = 'Username';
-  static const usernameHint = 'Used to sign in. Letters, numbers, dot or underscore.';
+  static const usernameHint =
+      'Used to sign in. Letters, numbers, dot or underscore.';
   static const emailOrUsername = 'Email or username';
   static const signUpVerifyEmail =
       'Account created. Check your email to confirm, then sign in.';
   static const profileTitle = 'Profile';
   static const accountInfo = 'Account';
+  static const editProfile = 'Edit profile';
+  static const editDetails = 'Edit details';
+  static const sectionContact = 'Contact';
+  static const sectionWorkSchool = 'Work & school';
+  static const profileEmptyHint =
+      'No details added yet. Tap Edit to add contact, health and emergency info.';
   static const profileDetailsHint =
       'Add phone, health, and emergency details for your household.';
   static const noHousehold = 'Join or create a family to get started';
@@ -450,7 +478,8 @@ abstract final class AppStrings {
   static const onboardingSubtitle =
       'Track pantry stock, plan meals, manage expenses, and shop smarter — together as a family.';
   static const onboardingSlide1Title = 'Welcome to MyPlanr';
-  static const onboardingSlide1Body = 'Run your home together — one app for your whole family.';
+  static const onboardingSlide1Body =
+      'Run your home together — one app for your whole family.';
   static const onboardingSlide2Title = 'Track what you have';
   static const onboardingSlide2Body =
       'Pantry stock, home assets, and warranty dates — know what is at home.';
@@ -458,7 +487,8 @@ abstract final class AppStrings {
   static const onboardingSlide3Body =
       'Tasks, meals, medicine, and shopping — for you and family members.';
   static const onboardingSlide4Title = 'Ready?';
-  static const onboardingSlide4Body = 'Create an account or sign in to get started.';
+  static const onboardingSlide4Body =
+      'Create an account or sign in to get started.';
   static const skip = 'Skip';
   static const next = 'Next';
   static const getStarted = 'Get started';
@@ -472,7 +502,8 @@ abstract final class AppStrings {
   // Setup wizard
   static const setupWizardTitle = 'Set up your family';
   static const interestsQuestion = 'What do you want to track?';
-  static const interestsHint = 'Pick at least one. You can change this later in Family settings.';
+  static const interestsHint =
+      'Pick at least one. You can change this later in Family settings.';
   static const continueToHome = 'Continue to home';
   static const skipForNow = 'Skip for now';
   static const wizardStepOf = 'Step';
@@ -518,6 +549,8 @@ abstract final class AppStrings {
   static const reminderSourceMedicine = 'Medicine';
   static const reminderSourceStandalone = 'Custom';
   static const reminderRepeatingDaily = 'Repeats daily';
+  static const reminderRepeatLabel = 'Repeat';
+  static const reminderRepeatHint = 'How often this reminder should repeat';
   static const reminderDeleteConfirm = 'Remove this reminder?';
   static const reminderDeleted = 'Reminder removed';
   static const reminderSaved = 'Reminder saved';
@@ -655,6 +688,40 @@ abstract final class AppStrings {
   static const feedbackEmpty = 'Please enter a message';
   static const moreFeedbackHint = 'Request features or report issues';
 
+  // Admin
+  static const adminTitle = 'Admin';
+  static const moreAdminHint = 'Review feedback and app issues';
+  static const adminOtpTitle = 'Admin verification';
+  static const adminOtpBody =
+      'For security, admin access requires a one-time code. '
+      'We sent a 6-digit code to your account email.';
+  static const adminOtpSentTo = 'Code sent to';
+  static const adminOtpCodeLabel = 'Enter 6-digit code';
+  static const adminOtpVerify = 'Verify & continue';
+  static const adminOtpResend = 'Resend code';
+  static const adminOtpSending = 'Sending code…';
+  static const adminOtpResent = 'A new code has been sent.';
+  static const adminOtpInvalid = 'That code is invalid or expired.';
+  static const adminOtpNeedsCode = 'Enter the 6-digit code.';
+  static const adminSectionFeedback = 'Feedback';
+  static const adminSectionErrors = 'Issues';
+  static const adminNoFeedback = 'No feedback yet.';
+  static const adminNoErrors = 'No issues reported.';
+  static const adminUnknownReporter = 'Unknown user';
+  static const adminAnonymous = 'Anonymous';
+  static const adminClearAll = 'Clear all';
+  static const adminGroupToday = 'Today';
+  static const adminGroupYesterday = 'Yesterday';
+  static const adminDeleteTitle = 'Delete?';
+  static const adminDeleteItemConfirm =
+      'Delete this entry? This cannot be undone.';
+  static const adminDeleteGroupConfirm =
+      "Delete all entries from this day? This can't be undone.";
+  static const adminDeleteAllConfirm =
+      "Delete every entry in this list? This can't be undone.";
+  static const adminDeleted = 'Deleted';
+  static const adminDeleteFailed = 'Could not delete. Please try again.';
+
   // Common
   static const save = 'Save';
   static const cancel = 'Cancel';
@@ -763,6 +830,23 @@ abstract final class AppStrings {
   static const forgotPassword = 'Forgot password?';
   static const resetPassword = 'Reset password';
   static const resetPasswordSent = 'Check your email for a reset link';
+  static const resetSendCode = 'Send code';
+  static const resetEmailHint =
+      "Enter your account email and we'll send a 6-digit reset code.";
+  static const resetOtpTitle = 'Enter reset code';
+  static const resetOtpBody =
+      'Enter the 6-digit code we emailed you, then choose a new password.';
+  static const resetOtpSentTo = 'Code sent to';
+  static const resetCodeLabel = '6-digit code';
+  static const newPassword = 'New password';
+  static const resetOtpNeedsCode = 'Enter the 6-digit code.';
+  static const resetResendCode = 'Resend code';
+  static const resetResending = 'Sending…';
+  static const resetCodeResent = 'A new code has been sent.';
+  static const resetInvalidCode = 'That code is invalid or expired.';
+  static const resetPasswordUpdated =
+      'Password updated. Please sign in with your new password.';
+  static const resetPasswordCta = 'Update password';
   static const restockOnBuy = 'Restock pantry when bought';
   static const itemDeleted = 'Item deleted';
 }

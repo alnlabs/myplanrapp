@@ -93,7 +93,8 @@ class PantryRepository {
         .from('stock_events')
         .select()
         .eq('item_id', itemId)
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false)
+        .limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => StockEvent.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -102,7 +103,7 @@ class PantryRepository {
   Future<List<PantryItem>> fetchLowStock(String householdId) async {
     final data = await _client.rpc('check_low_stock', params: {
       'p_household_id': householdId,
-    });
+    }).limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => PantryItem.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -112,7 +113,7 @@ class PantryRepository {
     final data = await _client.rpc('check_expiring_soon', params: {
       'p_household_id': householdId,
       'p_days': 3,
-    });
+    }).limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => PantryItem.fromJson(e as Map<String, dynamic>))
         .toList();

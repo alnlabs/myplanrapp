@@ -78,7 +78,12 @@ class AppLogger {
   static const _prefsKey = 'diagnostic_logs_v1';
   static const _maxEntries = 500;
 
-  final ValueNotifier<List<LogEntry>> entries = ValueNotifier<List<LogEntry>>([]);
+  final ValueNotifier<List<LogEntry>> entries =
+      ValueNotifier<List<LogEntry>>([]);
+
+  /// Optional best-effort sink invoked for every error-level entry (e.g. to
+  /// upload crash reports). Must never throw or call back into [AppLogger].
+  void Function(LogEntry entry)? errorSink;
 
   SharedPreferences? _prefs;
   bool _initialized = false;
@@ -128,6 +133,14 @@ class AppLogger {
     }
     entries.value = next;
     _scheduleSave();
+
+    if (level == LogLevel.error && errorSink != null) {
+      try {
+        errorSink!(entry);
+      } catch (_) {
+        // Never let the sink break logging.
+      }
+    }
   }
 
   void _scheduleSave() {

@@ -107,11 +107,28 @@ class AuthRepository {
     }
   }
 
-  Future<void> resetPassword(String email) async {
-    await _client.auth.resetPasswordForEmail(
-      email.trim(),
-      redirectTo: AuthRedirect.url,
+  /// Sends a password-reset OTP (6-digit code) to the account email. The
+  /// recovery email template renders `{{ .Token }}` so no link is included.
+  Future<void> sendPasswordResetOtp(String email) async {
+    await _client.auth.resetPasswordForEmail(email.trim());
+  }
+
+  /// Verifies the emailed recovery code. On success Supabase establishes a
+  /// short-lived recovery session that authorizes [updatePassword].
+  Future<void> verifyPasswordResetOtp({
+    required String email,
+    required String token,
+  }) async {
+    await _client.auth.verifyOTP(
+      email: email.trim(),
+      token: token.trim(),
+      type: OtpType.recovery,
     );
+  }
+
+  /// Sets a new password for the currently authenticated (recovery) session.
+  Future<void> updatePassword(String newPassword) async {
+    await _client.auth.updateUser(UserAttributes(password: newPassword));
   }
 
   /// After sign-in, check grace-period deletion state.
@@ -152,6 +169,12 @@ class AuthRepository {
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(ref.watch(supabaseClientProvider));
 });
+
+/// True while a password reset is being completed (recovery OTP verified and
+/// the new password is being saved). The router reads this to avoid bouncing the
+/// user off the reset screen when the recovery session momentarily signs them
+/// in mid-flow.
+final passwordResetInProgressProvider = StateProvider<bool>((ref) => false);
 
 final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
   ref.watch(authStateProvider);

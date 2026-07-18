@@ -5,7 +5,7 @@ abstract final class ListGridLayout {
   static const crossAxisCount = 2;
   static const tabCrossAxisCount = 3;
   static const spacing = 8.0;
-  static const mainAxisExtent = 108.0;
+  static const mainAxisExtent = 128.0;
   static const padding = EdgeInsets.fromLTRB(16, 8, 16, 96);
 
   static const gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(

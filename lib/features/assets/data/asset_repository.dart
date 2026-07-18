@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_providers.dart';
 import '../../../shared/constants/asset_constants.dart';
+import '../../../shared/constants/list_pagination.dart';
 import '../../../shared/models/home_asset.dart';
 import '../../auth/data/auth_repository.dart';
 
@@ -17,7 +18,8 @@ class AssetRepository {
         .select()
         .eq('household_id', householdId)
         .neq('status', 'disposed')
-        .order('name');
+        .order('name')
+        .limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => HomeAsset.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -71,7 +73,8 @@ class AssetRepository {
         .from('asset_service_records')
         .select()
         .eq('asset_id', assetId)
-        .order('service_date', ascending: false);
+        .order('service_date', ascending: false)
+        .limit(kSafetyFetchCap);
     return (data as List)
         .map((e) => AssetServiceRecord.fromJson(e as Map<String, dynamic>))
         .toList();

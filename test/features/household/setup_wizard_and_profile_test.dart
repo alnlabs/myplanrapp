@@ -150,7 +150,7 @@ void main() {
       );
 
       expect(find.text(AppStrings.profileTitle), findsOneWidget);
-      expect(find.text(AppStrings.tabOverview), findsOneWidget);
+      expect(find.text(AppStrings.editProfile), findsWidgets);
     });
   });
 }
