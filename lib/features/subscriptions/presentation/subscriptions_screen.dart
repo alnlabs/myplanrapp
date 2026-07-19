@@ -25,11 +25,10 @@ class SubscriptionsScreen extends ConsumerWidget {
         ref.watch(listDisplayModeProvider(ListDisplayModeKeys.subscriptions));
 
     return Scaffold(
-      appBar: FeatureScreenAppBar.forShellRoute(
-        context,
+      appBar: const FeatureScreenAppBar(
         title: AppStrings.subscriptionsTitle,
         subtitle: AppStrings.subscriptionsSubtitle,
-        actions: const [
+        actions: [
           ListDisplayModeToggle(
             screenKey: ListDisplayModeKeys.subscriptions,
           ),

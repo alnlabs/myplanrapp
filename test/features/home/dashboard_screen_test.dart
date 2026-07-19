@@ -46,11 +46,9 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('renders greeting, quick actions, and today overview', (tester) async {
+    testWidgets('renders greeting', (tester) async {
       await pumpDashboardWithRoutes(tester);
 
-      expect(find.text(AppStrings.quickActions), findsOneWidget);
-      expect(find.text(AppStrings.todayOverview), findsOneWidget);
       expect(
         find.textContaining(
           RegExp(
@@ -59,24 +57,6 @@ void main() {
         ),
         findsOneWidget,
       );
-    });
-
-    testWidgets('quick action expense opens add expense screen', (tester) async {
-      await pumpDashboardWithRoutes(tester);
-
-      await tester.tap(find.text(AppStrings.quickActionExpense));
-      await tester.pumpAndSettle();
-
-      expect(find.text(AppStrings.addExpense), findsOneWidget);
-    });
-
-    testWidgets('quick action shop navigates to shop route', (tester) async {
-      await pumpDashboardWithRoutes(tester);
-
-      await tester.tap(find.text(AppStrings.quickActionShop));
-      await tester.pumpAndSettle();
-
-      expect(find.text('shop-route'), findsOneWidget);
     });
   });
 }

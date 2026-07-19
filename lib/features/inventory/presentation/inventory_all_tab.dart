@@ -75,6 +75,7 @@ class InventoryAllTab extends ConsumerWidget {
             ],
             PaginatedListFooter(
               state: pantryState,
+              idleHeight: 0,
               onRetryLoadMore: () =>
                   ref.read(pantryItemsListProvider.notifier).loadMore(),
             ),

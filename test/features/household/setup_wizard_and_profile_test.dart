@@ -6,11 +6,9 @@ import 'package:myplanr/core/strings/app_strings.dart';
 import 'package:myplanr/features/auth/data/auth_repository.dart';
 import 'package:myplanr/features/household/data/family_repository.dart';
 import 'package:myplanr/features/household/data/household_repository.dart';
-import 'package:myplanr/features/household/data/household_settings_repository.dart';
 import 'package:myplanr/features/household/presentation/setup_wizard_screen.dart';
 import 'package:myplanr/features/profile/presentation/profile_screen.dart';
 import 'package:myplanr/shared/models/family_member.dart';
-import 'package:myplanr/shared/constants/household_modules.dart';
 
 import '../../helpers/provider_overrides.dart';
 import '../../helpers/pump_app.dart';
@@ -20,7 +18,6 @@ import '../../helpers/test_fixtures.dart';
 void main() {
   group('SetupWizardScreen behavior', () {
     late StubFamilyRepository familyRepo;
-    late StubHouseholdSettingsRepository settingsRepo;
     late StubAuthRepository authRepo;
 
     Future<void> pumpWizard(WidgetTester tester) async {
@@ -46,7 +43,6 @@ void main() {
             ...testAuthOverrides,
             authRepositoryProvider.overrideWith((ref) => authRepo),
             familyRepositoryProvider.overrideWithValue(familyRepo),
-            householdSettingsRepositoryProvider.overrideWithValue(settingsRepo),
             familyRosterProvider.overrideWith((ref) async => const [
                   FamilyMember(
                     id: 'member-1',
@@ -67,7 +63,6 @@ void main() {
 
     setUp(() {
       familyRepo = StubFamilyRepository();
-      settingsRepo = StubHouseholdSettingsRepository();
       authRepo = StubAuthRepository();
     });
 
@@ -75,28 +70,11 @@ void main() {
       await pumpWizard(tester);
 
       expect(find.text(AppStrings.setupWizardTitle), findsOneWidget);
-      expect(find.text(AppStrings.interestsQuestion), findsOneWidget);
-    });
-
-    testWidgets('toggles interest chip selection', (tester) async {
-      await pumpWizard(tester);
-
-      final groceriesChip = find.textContaining('Groceries & pantry');
-      await tester.tap(groceriesChip);
-      await tester.pumpAndSettle();
-      await tester.tap(groceriesChip);
-      await tester.pumpAndSettle();
-      await tester.tap(groceriesChip);
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('Groceries & pantry'), findsOneWidget);
+      expect(find.text(AppStrings.wizardProfileTitle), findsOneWidget);
     });
 
     testWidgets('profile step validates required display name', (tester) async {
       await pumpWizard(tester);
-
-      await tester.tap(find.text(AppStrings.next));
-      await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextFormField).first, '');
       await tester.pumpAndSettle();
@@ -106,11 +84,9 @@ void main() {
       expect(find.text(AppStrings.requiredField), findsOneWidget);
     });
 
-    testWidgets('finishing wizard saves modules and navigates home', (tester) async {
+    testWidgets('finishing wizard adds family member and navigates home',
+        (tester) async {
       await pumpWizard(tester);
-
-      await tester.tap(find.text(AppStrings.next));
-      await tester.pumpAndSettle();
 
       await enterTextByLabel(tester, AppStrings.displayName, 'Alex Parent');
       await enterTextByLabel(tester, AppStrings.phoneOptional, '9876543210');
@@ -125,7 +101,6 @@ void main() {
       await tester.tap(find.text(AppStrings.wizardFinish));
       await tester.pumpAndSettle();
 
-      expect(settingsRepo.lastUpdatedModules, isNotNull);
       expect(familyRepo.lastAddedMemberName, 'Sam');
       expect(find.text('home-route'), findsOneWidget);
     });

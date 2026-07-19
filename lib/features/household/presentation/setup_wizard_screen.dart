@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/supabase_providers.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/constants/family_relationships.dart';
-import '../../../shared/constants/household_modules.dart';
 import '../../../shared/models/family_member.dart';
 import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/utils/validators.dart';
@@ -13,7 +12,6 @@ import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/loading_button.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/family_repository.dart';
-import '../data/household_settings_repository.dart';
 
 class SetupWizardScreen extends ConsumerStatefulWidget {
   const SetupWizardScreen({super.key, required this.householdId});
@@ -30,16 +28,13 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
   final _phone = TextEditingController();
   final _memberName = TextEditingController();
 
-  final Set<String> _selected = {HouseholdInterests.groceries};
   String _memberRelationship = FamilyRelationships.spouse.value;
   int _step = 0;
   bool _loading = false;
   bool _profileLoaded = false;
   String? _error;
 
-  bool get _showQuickStart => _selected.contains(HouseholdInterests.groceries);
-
-  int get _totalSteps => 2 + (_showQuickStart ? 1 : 0) + 1;
+  static const _totalSteps = 3;
 
   @override
   void initState() {
@@ -168,15 +163,6 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
     });
     try {
       await _maybeAddFamilyMember();
-
-      final modules =
-          HouseholdInterests.modulesFromInterests(_selected).toList();
-      await ref.read(householdSettingsRepositoryProvider).updateEnabledModules(
-            widget.householdId,
-            modules,
-          );
-      ref.invalidate(householdSettingsProvider);
-      ref.invalidate(enabledModulesProvider);
       if (mounted) context.go('/home');
     } catch (e) {
       setState(() => _error = ApiErrorFormatter.format(e));
@@ -186,13 +172,14 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
   }
 
   int _stepKindForIndex(int index) {
-    var i = 0;
-    if (index == i++) return 0; // interests
-    if (index == i++) return 1; // profile
-    if (_showQuickStart) {
-      if (index == i++) return 2; // quick start
+    switch (index) {
+      case 0:
+        return 1; // profile
+      case 1:
+        return 2; // quick start
+      default:
+        return 3; // family
     }
-    return 3; // family
   }
 
   bool get _canSkipCurrentStep {
@@ -245,9 +232,8 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
               controller: _pageController,
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                _interestsStep(),
                 _profileStep(),
-                if (_showQuickStart) _quickStartStep(),
+                _quickStartStep(),
                 _familyStep(),
               ],
             ),
@@ -282,46 +268,6 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _interestsStep() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Text(
-          AppStrings.interestsQuestion,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          AppStrings.interestsHint,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-        const SizedBox(height: 20),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: HouseholdInterests.all.map((interest) {
-            final selected = _selected.contains(interest.id);
-            return FilterChip(
-              label: Text('${interest.icon} ${interest.label}'),
-              selected: selected,
-              onSelected: (value) {
-                setState(() {
-                  if (value) {
-                    _selected.add(interest.id);
-                  } else if (_selected.length > 1) {
-                    _selected.remove(interest.id);
-                  }
-                });
-              },
-            );
-          }).toList(),
-        ),
-      ],
     );
   }
 

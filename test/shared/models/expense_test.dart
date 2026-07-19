@@ -19,6 +19,23 @@ void main() {
     });
   });
 
+  group('MoneyScope', () {
+    test('dbValue matches enum name', () {
+      expect(MoneyScope.personal.dbValue, 'personal');
+      expect(MoneyScope.household.dbValue, 'household');
+    });
+
+    test('fromDb maps personal string', () {
+      expect(MoneyScope.fromDb('personal'), MoneyScope.personal);
+    });
+
+    test('fromDb defaults unknown/null to household', () {
+      expect(MoneyScope.fromDb(null), MoneyScope.household);
+      expect(MoneyScope.fromDb('household'), MoneyScope.household);
+      expect(MoneyScope.fromDb('other'), MoneyScope.household);
+    });
+  });
+
   group('ExpenseCategory', () {
     test('isExpenseCategory for expense kind', () {
       const cat = ExpenseCategory(id: '1', name: 'Food', categoryKind: 'expense');
@@ -161,6 +178,32 @@ void main() {
       expect(expense.groupName, 'Roommates');
       expect(expense.paidByMemberName, 'Alex');
       expect(expense.splits, hasLength(1));
+      expect(expense.scope, MoneyScope.household);
+    });
+
+    test('parses personal scope', () {
+      final expense = Expense.fromJson({
+        'id': 'e2',
+        'household_id': 'hh',
+        'category_id': 'c1',
+        'amount': 5,
+        'title': 'Private',
+        'expense_date': '2026-07-08',
+        'scope': 'personal',
+      });
+      expect(expense.scope, MoneyScope.personal);
+    });
+
+    test('defaults scope to household when missing', () {
+      final expense = Expense.fromJson({
+        'id': 'e3',
+        'household_id': 'hh',
+        'category_id': 'c1',
+        'amount': 5,
+        'title': 'Shared',
+        'expense_date': '2026-07-08',
+      });
+      expect(expense.scope, MoneyScope.household);
     });
 
     test('parses income entry fields', () {

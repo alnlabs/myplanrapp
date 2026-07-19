@@ -150,8 +150,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
               },
               onDelete: () => _deleteSelected(),
             )
-          : FeatureScreenAppBar.forShellRoute(
-        context,
+          : FeatureScreenAppBar(
         title: AppStrings.shopTitle,
         subtitle: AppStrings.shopSubtitle,
         actions: [

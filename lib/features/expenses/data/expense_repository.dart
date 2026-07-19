@@ -7,8 +7,10 @@ import '../../../shared/models/expense_split.dart';
 import '../../../shared/models/paginated_result.dart';
 import '../../../shared/utils/paginated_page_parser.dart';
 import '../../auth/data/auth_repository.dart';
+import '../utils/expense_comparison.dart';
 import 'expense_date_filter.dart';
 import 'expense_date_filter_provider.dart';
+import 'expense_view_provider.dart';
 
 class ExpenseRepository {
   ExpenseRepository(this._client);
@@ -75,6 +77,7 @@ class ExpenseRepository {
     DateTime? startDate,
     DateTime? endDate,
     String? groupId,
+    MoneyScope? scope,
   }) async {
     var query = _client
         .from('expenses')
@@ -85,6 +88,9 @@ class ExpenseRepository {
     }
     if (familyMemberId != null) {
       query = query.eq('family_member_id', familyMemberId);
+    }
+    if (scope != null) {
+      query = query.eq('scope', scope.dbValue);
     }
     if (startDate != null) {
       query = query.gte('expense_date', ExpenseDateRange.toIsoDate(startDate));
@@ -196,6 +202,7 @@ class ExpenseRepository {
     String? recurringRuleId,
     String? sourceSubscriptionId,
     bool isRecurringInstance = false,
+    MoneyScope scope = MoneyScope.household,
   }) async {
     if (pantryItemId != null && restockDelta != null) {
       final data = await _client.rpc('log_grocery_expense', params: {
@@ -223,6 +230,7 @@ class ExpenseRepository {
           'note': note,
           'expense_date': expenseDate.toIso8601String().split('T').first,
           'entry_type': MoneyEntryType.expense.dbValue,
+          'scope': scope.dbValue,
           'paid_by': userId,
           'created_by': userId,
           'recurring_rule_id': recurringRuleId,
@@ -243,6 +251,7 @@ class ExpenseRepository {
     required DateTime incomeDate,
     String? note,
     String? recurringRuleId,
+    MoneyScope scope = MoneyScope.household,
   }) async {
     final userId = _client.auth.currentUser?.id;
     final source = incomeSource.trim();
@@ -257,6 +266,7 @@ class ExpenseRepository {
           'note': note,
           'expense_date': incomeDate.toIso8601String().split('T').first,
           'entry_type': MoneyEntryType.income.dbValue,
+          'scope': scope.dbValue,
           'family_member_id': familyMemberId,
           'recurring_rule_id': recurringRuleId,
           'created_by': userId,
@@ -277,6 +287,7 @@ class ExpenseRepository {
     required String title,
     required DateTime expenseDate,
     String? note,
+    MoneyScope? scope,
   }) async {
     final data = await _client
         .from('expenses')
@@ -286,6 +297,7 @@ class ExpenseRepository {
           'title': title,
           'note': note,
           'expense_date': expenseDate.toIso8601String().split('T').first,
+          if (scope != null) 'scope': scope.dbValue,
         })
         .eq('id', id)
         .select(_expenseSelect)
@@ -301,6 +313,7 @@ class ExpenseRepository {
     required String incomeSource,
     required DateTime incomeDate,
     String? note,
+    MoneyScope? scope,
   }) async {
     final source = incomeSource.trim();
     final data = await _client
@@ -313,6 +326,7 @@ class ExpenseRepository {
           'family_member_id': familyMemberId,
           'note': note,
           'expense_date': incomeDate.toIso8601String().split('T').first,
+          if (scope != null) 'scope': scope.dbValue,
         })
         .eq('id', id)
         .select(_expenseSelect)
@@ -323,13 +337,19 @@ class ExpenseRepository {
   Future<List<ExpenseSummaryRow>> fetchSummaryRange(
     String householdId,
     DateTime start,
-    DateTime end,
-  ) async {
+    DateTime end, {
+    MoneyScope? scope,
+    String? viewerId,
+    String? groupId,
+  }) async {
     final data =
         await _client.rpc('household_expense_summary_range', params: {
       'p_household_id': householdId,
       'p_start': ExpenseDateRange.toIsoDate(start),
       'p_end': ExpenseDateRange.toIsoDate(end),
+      'p_scope': scope?.dbValue,
+      'p_viewer': viewerId,
+      'p_group_id': groupId,
     });
     return (data as List)
         .map((e) => ExpenseSummaryRow.fromJson(e as Map<String, dynamic>))
@@ -354,12 +374,18 @@ class ExpenseRepository {
   Future<MoneySummary> fetchMoneySummaryRange(
     String householdId,
     DateTime start,
-    DateTime end,
-  ) async {
+    DateTime end, {
+    MoneyScope? scope,
+    String? viewerId,
+    String? groupId,
+  }) async {
     final data = await _client.rpc('household_money_summary_range', params: {
       'p_household_id': householdId,
       'p_start': ExpenseDateRange.toIsoDate(start),
       'p_end': ExpenseDateRange.toIsoDate(end),
+      'p_scope': scope?.dbValue,
+      'p_viewer': viewerId,
+      'p_group_id': groupId,
     });
     final rows = data as List;
     if (rows.isEmpty) {
@@ -396,13 +422,19 @@ class ExpenseRepository {
   Future<List<MemberIncomeSummary>> fetchIncomeByMemberRange(
     String householdId,
     DateTime start,
-    DateTime end,
-  ) async {
+    DateTime end, {
+    MoneyScope? scope,
+    String? viewerId,
+    String? groupId,
+  }) async {
     final data =
         await _client.rpc('household_income_by_member_range', params: {
       'p_household_id': householdId,
       'p_start': ExpenseDateRange.toIsoDate(start),
       'p_end': ExpenseDateRange.toIsoDate(end),
+      'p_scope': scope?.dbValue,
+      'p_viewer': viewerId,
+      'p_group_id': groupId,
     });
     return (data as List)
         .map((e) => MemberIncomeSummary.fromJson(e as Map<String, dynamic>))
@@ -521,10 +553,15 @@ final expenseSummaryProvider = FutureProvider<List<ExpenseSummaryRow>>((ref) asy
   final householdId = profile?.activeHouseholdId;
   if (householdId == null) return [];
   final range = ref.watch(expenseDateRangeProvider);
+  final view = ref.watch(expenseViewProvider);
+  final viewerId = ref.watch(currentUserIdProvider);
   return ref.watch(expenseRepositoryProvider).fetchSummaryRange(
         householdId,
         range.start,
         range.end,
+        scope: view.scope,
+        viewerId: viewerId,
+        groupId: view.groupFilterId,
       );
 });
 
@@ -535,11 +572,119 @@ final moneySummaryProvider = FutureProvider<MoneySummary>((ref) async {
     return const MoneySummary(totalSpent: 0, totalEarned: 0, netAmount: 0);
   }
   final range = ref.watch(expenseDateRangeProvider);
+  final view = ref.watch(expenseViewProvider);
+  final viewerId = ref.watch(currentUserIdProvider);
   return ref.watch(expenseRepositoryProvider).fetchMoneySummaryRange(
         householdId,
         range.start,
         range.end,
+        scope: view.scope,
+        viewerId: viewerId,
+        groupId: view.groupFilterId,
       );
+});
+
+class ExpenseComparison {
+  const ExpenseComparison({
+    required this.preset,
+    required this.currentSpent,
+    required this.previousSpent,
+  });
+
+  final ExpenseDatePreset preset;
+  final double currentSpent;
+  final double previousSpent;
+
+  double get delta => currentSpent - previousSpent;
+
+  /// Fractional change vs the previous period; null when there was no
+  /// previous spending to compare against.
+  double? get changeRatio => spendingChangeRatio(currentSpent, previousSpent);
+}
+
+final expenseComparisonProvider =
+    FutureProvider<ExpenseComparison>((ref) async {
+  final profile = await ref.watch(userProfileProvider.future);
+  final filter = ref.watch(expenseDateFilterProvider);
+  final currentSummary = await ref.watch(moneySummaryProvider.future);
+  final householdId = profile?.activeHouseholdId;
+  if (householdId == null) {
+    return ExpenseComparison(
+      preset: filter.preset,
+      currentSpent: currentSummary.totalSpent,
+      previousSpent: 0,
+    );
+  }
+  final previous = previousExpenseRange(filter);
+  final view = ref.watch(expenseViewProvider);
+  final viewerId = ref.watch(currentUserIdProvider);
+  final previousSummary =
+      await ref.watch(expenseRepositoryProvider).fetchMoneySummaryRange(
+            householdId,
+            previous.start,
+            previous.end,
+            scope: view.scope,
+            viewerId: viewerId,
+            groupId: view.groupFilterId,
+          );
+  return ExpenseComparison(
+    preset: filter.preset,
+    currentSpent: currentSummary.totalSpent,
+    previousSpent: previousSummary.totalSpent,
+  );
+});
+
+class ExpenseHistoryPoint {
+  const ExpenseHistoryPoint({
+    required this.range,
+    required this.spent,
+    required this.isCurrent,
+  });
+
+  final ExpenseDateRange range;
+  final double spent;
+  final bool isCurrent;
+}
+
+/// Spending totals for the last 7 periods of the currently selected view type,
+/// oldest first, with the current period flagged.
+final expenseHistoryProvider =
+    FutureProvider<List<ExpenseHistoryPoint>>((ref) async {
+  final profile = await ref.watch(userProfileProvider.future);
+  final filter = ref.watch(expenseDateFilterProvider);
+  final ranges = historyExpenseRanges(filter);
+  final householdId = profile?.activeHouseholdId;
+  if (householdId == null) {
+    return [
+      for (var i = 0; i < ranges.length; i++)
+        ExpenseHistoryPoint(
+          range: ranges[i],
+          spent: 0,
+          isCurrent: i == ranges.length - 1,
+        ),
+    ];
+  }
+  final repo = ref.watch(expenseRepositoryProvider);
+  final view = ref.watch(expenseViewProvider);
+  final viewerId = ref.watch(currentUserIdProvider);
+  final summaries = await Future.wait(
+    ranges.map((r) => repo.fetchMoneySummaryRange(
+          householdId,
+          r.start,
+          r.end,
+          scope: view.scope,
+          viewerId: viewerId,
+          groupId: view.groupFilterId,
+        )),
+  );
+  return [
+    for (var i = 0; i < ranges.length; i++)
+      ExpenseHistoryPoint(
+        range: ranges[i],
+        spent: summaries[i].totalSpent,
+        isCurrent: i == ranges.length - 1,
+      ),
+  ];
 });
 
 final memberIncomeSummaryProvider =
@@ -548,10 +693,15 @@ final memberIncomeSummaryProvider =
   final householdId = profile?.activeHouseholdId;
   if (householdId == null) return [];
   final range = ref.watch(expenseDateRangeProvider);
+  final view = ref.watch(expenseViewProvider);
+  final viewerId = ref.watch(currentUserIdProvider);
   return ref.watch(expenseRepositoryProvider).fetchIncomeByMemberRange(
         householdId,
         range.start,
         range.end,
+        scope: view.scope,
+        viewerId: viewerId,
+        groupId: view.groupFilterId,
       );
 });
 

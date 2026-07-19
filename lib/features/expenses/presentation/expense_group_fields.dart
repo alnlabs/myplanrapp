@@ -160,8 +160,10 @@ class ExpenseGroupFieldsState extends ConsumerState<ExpenseGroupFields> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String?>(
                     value: _paidByMemberId,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: AppStrings.paidByMember,
+                      helperText: AppStrings.paidByHint,
                     ),
                     items: active
                         .map(
@@ -171,17 +173,31 @@ class ExpenseGroupFieldsState extends ConsumerState<ExpenseGroupFields> {
                           ),
                         )
                         .toList(),
+                    // Exactly one payer is required for shared expenses so the
+                    // split balances can be attributed correctly.
+                    validator: group?.isShared == true
+                        ? (v) => v == null ? AppStrings.requiredField : null
+                        : null,
                     onChanged: (v) => setState(() {
                       _paidByMemberId = v;
                       _notify();
                     }),
                   ),
                   if (group?.isShared == true) ...[
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
                     const SizedBox(height: 12),
                     Text(
-                      AppStrings.participants,
+                      AppStrings.splitBetween,
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
+                    Text(
+                      AppStrings.splitBetweenHint,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
                     ...active.map(
                       (m) => CheckboxListTile(
                         contentPadding: EdgeInsets.zero,

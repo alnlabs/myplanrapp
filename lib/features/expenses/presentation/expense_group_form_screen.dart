@@ -25,7 +25,7 @@ class ExpenseGroupFormScreen extends ConsumerStatefulWidget {
 class _ExpenseGroupFormScreenState extends ConsumerState<ExpenseGroupFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
-  var _groupType = 'organizational';
+  var _groupType = 'shared';
   final _selectedFamilyIds = <String>{};
   final _guests = <ExpenseGroupMemberInput>[];
   bool _loading = false;
@@ -81,7 +81,9 @@ class _ExpenseGroupFormScreenState extends ConsumerState<ExpenseGroupFormScreen>
         ExpenseGroupMemberInput(
           displayName: name,
           guestEmail: email.isEmpty ? null : email,
-          inviteStatus: email.isEmpty ? 'active' : 'pending',
+          // Guests are tracked participants (not app users who must accept an
+          // invite), so they're active immediately and usable in splits.
+          inviteStatus: 'active',
         ),
       );
     });
@@ -126,7 +128,9 @@ class _ExpenseGroupFormScreenState extends ConsumerState<ExpenseGroupFormScreen>
             members: members,
           );
       ref.invalidate(expenseGroupsProvider);
-      if (mounted) context.go('/expenses/groups/$groupId');
+      // pushReplacement (not go) keeps the underlying hub/list on the stack so
+      // the new group's detail screen still has a working back button.
+      if (mounted) context.pushReplacement('/expenses/groups/$groupId');
     } catch (e) {
       setState(() => _error = ApiErrorFormatter.format(e));
     } finally {

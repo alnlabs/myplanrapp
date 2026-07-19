@@ -15,6 +15,7 @@ import '../../../shared/widgets/selection_app_bar.dart';
 import '../../assets/data/asset_repository.dart';
 import '../../assets/presentation/asset_form_screen.dart';
 import '../../assets/presentation/assets_list_tab.dart';
+import '../../home/presentation/app_drawer.dart';
 import '../../pantry/data/pantry_items_list_provider.dart';
 import '../../pantry/data/pantry_repository.dart';
 import 'inventory_all_tab.dart';
@@ -162,6 +163,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               context,
               title: AppStrings.inventoryTitle,
               subtitle: AppStrings.inventorySubtitle,
+              leading: const DrawerMenuButton(),
               actions: [
                 IconButton(
                   tooltip: AppStrings.search,

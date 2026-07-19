@@ -7,6 +7,7 @@ import '../../../shared/models/expense.dart';
 import '../../../shared/models/recurring_money_rule.dart';
 import '../../auth/data/auth_repository.dart';
 import 'expense_date_filter.dart';
+import 'expense_view_provider.dart';
 
 class RecurringMoneyRuleRepository {
   RecurringMoneyRuleRepository(this._client);
@@ -20,6 +21,8 @@ class RecurringMoneyRuleRepository {
   Future<List<RecurringMoneyRule>> fetchRules(
     String householdId, {
     String? entryType,
+    MoneyScope? scope,
+    String? groupId,
   }) async {
     var query = _client
         .from('recurring_money_rules')
@@ -27,6 +30,12 @@ class RecurringMoneyRuleRepository {
         .eq('household_id', householdId);
     if (entryType != null) {
       query = query.eq('entry_type', entryType);
+    }
+    if (scope != null) {
+      query = query.eq('scope', scope.dbValue);
+    }
+    if (groupId != null) {
+      query = query.eq('group_id', groupId);
     }
     final data = await query.order('next_due_date').limit(kSafetyFetchCap);
     return (data as List)
@@ -52,6 +61,8 @@ class RecurringMoneyRuleRepository {
   Future<List<RecurringMoneyRule>> fetchDueRules(
     String householdId, {
     String? entryType,
+    MoneyScope? scope,
+    String? groupId,
   }) async {
     final today = ExpenseDateRange.toIsoDate(DateTime.now());
     var query = _client
@@ -62,6 +73,12 @@ class RecurringMoneyRuleRepository {
         .lte('next_due_date', today);
     if (entryType != null) {
       query = query.eq('entry_type', entryType);
+    }
+    if (scope != null) {
+      query = query.eq('scope', scope.dbValue);
+    }
+    if (groupId != null) {
+      query = query.eq('group_id', groupId);
     }
     final data = await query.order('next_due_date').limit(kSafetyFetchCap);
     return (data as List)
@@ -82,6 +99,7 @@ class RecurringMoneyRuleRepository {
     int intervalCount = 1,
     int? dayOfMonth,
     String? note,
+    MoneyScope scope = MoneyScope.household,
   }) async {
     final userId = _client.auth.currentUser?.id;
     final source = incomeSource.trim();
@@ -91,6 +109,7 @@ class RecurringMoneyRuleRepository {
           'household_id': householdId,
           'created_by': userId,
           'entry_type': 'income',
+          'scope': scope.dbValue,
           'title': source,
           'income_source': source,
           'family_member_id': familyMemberId,
@@ -125,14 +144,18 @@ class RecurringMoneyRuleRepository {
     String? groupId,
     String? paidByMemberId,
     String? subscriptionId,
+    MoneyScope scope = MoneyScope.household,
   }) async {
     final userId = _client.auth.currentUser?.id;
+    // Group rules are always shared with the household.
+    final effectiveScope = groupId != null ? MoneyScope.household : scope;
     final data = await _client
         .from('recurring_money_rules')
         .insert({
           'household_id': householdId,
           'created_by': userId,
           'entry_type': 'expense',
+          'scope': effectiveScope.dbValue,
           'title': title.trim(),
           'category_id': categoryId,
           'amount': amount,
@@ -218,9 +241,13 @@ final recurringExpenseRulesProvider =
   final profile = await ref.watch(userProfileProvider.future);
   final householdId = profile?.activeHouseholdId;
   if (householdId == null) return [];
-  return ref
-      .watch(recurringMoneyRuleRepositoryProvider)
-      .fetchRules(householdId, entryType: 'expense');
+  final view = ref.watch(expenseViewProvider);
+  return ref.watch(recurringMoneyRuleRepositoryProvider).fetchRules(
+        householdId,
+        entryType: 'expense',
+        scope: view.scope,
+        groupId: view.groupFilterId,
+      );
 });
 
 final memberRecurringIncomeProvider =
@@ -236,9 +263,12 @@ final dueRecurringIncomeProvider =
   final profile = await ref.watch(userProfileProvider.future);
   final householdId = profile?.activeHouseholdId;
   if (householdId == null) return [];
+  final view = ref.watch(expenseViewProvider);
   return ref.watch(recurringMoneyRuleRepositoryProvider).fetchDueRules(
         householdId,
         entryType: 'income',
+        scope: view.scope,
+        groupId: view.groupFilterId,
       );
 });
 
@@ -247,8 +277,11 @@ final dueRecurringExpenseProvider =
   final profile = await ref.watch(userProfileProvider.future);
   final householdId = profile?.activeHouseholdId;
   if (householdId == null) return [];
+  final view = ref.watch(expenseViewProvider);
   return ref.watch(recurringMoneyRuleRepositoryProvider).fetchDueRules(
         householdId,
         entryType: 'expense',
+        scope: view.scope,
+        groupId: view.groupFilterId,
       );
 });

@@ -12,8 +12,8 @@ import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/async_screen_body.dart';
 import '../data/family_repository.dart';
 import '../data/household_repository.dart';
+import 'family_medicine_section.dart';
 import 'family_member_edit_screen.dart';
-import 'medicine_schedules_section.dart';
 import 'member_avatar_picker.dart';
 import 'member_income_section.dart';
 import 'member_role_actions.dart';
@@ -358,12 +358,10 @@ class _FamilyMemberDetailScreenState
     final children = <Widget>[];
     var addedDetailSection = false;
 
-    void addSection(String title, List<Widget?> rows) {
+    void addSection(String title, IconData icon, List<Widget?> rows) {
       final present = rows.whereType<Widget>().toList();
       if (present.isEmpty) return;
-      children.add(_sectionTitle(title));
-      children.addAll(present);
-      children.add(const SizedBox(height: 20));
+      children.add(_sectionCard(title, icon, present));
     }
 
     // Header
@@ -373,9 +371,10 @@ class _FamilyMemberDetailScreenState
         details: details,
         subtitle: widget.profileMode ? email : member.relationshipLabel,
         membership: widget.profileMode ? null : membership,
+        email: email,
       ),
     );
-    children.add(const SizedBox(height: 24));
+    children.add(const SizedBox(height: 20));
 
     if (managedByYou) {
       children.add(
@@ -398,7 +397,7 @@ class _FamilyMemberDetailScreenState
 
     // Member meta (family members only)
     if (!widget.profileMode) {
-      addSection(AppStrings.tabOverview, [
+      addSection(AppStrings.tabOverview, Icons.badge_outlined, [
         _valueRow(
           AppStrings.memberType,
           member.isAppMember ? AppStrings.appMember : AppStrings.profileOnly,
@@ -411,21 +410,22 @@ class _FamilyMemberDetailScreenState
           _valueRow(AppStrings.email, member.invitedEmail!),
       ]);
     } else if (email != null) {
-      addSection(AppStrings.accountInfo, [
+      addSection(AppStrings.accountInfo, Icons.account_circle_outlined, [
         _valueRow(AppStrings.email, email),
       ]);
     }
 
     // Contact
     if (phonePrivate) {
-      addSection(AppStrings.sectionContact, [_privateBanner()]);
+      addSection(AppStrings.sectionContact, Icons.call_outlined,
+          [_privateBanner()]);
     } else {
       final contactRows = [
         _valueRow(AppStrings.phone, details?.phone ?? member.phone),
         _valueRow(AppStrings.altPhone, details?.altPhone),
       ];
       if (contactRows.whereType<Widget>().isNotEmpty) addedDetailSection = true;
-      addSection(AppStrings.sectionContact, contactRows);
+      addSection(AppStrings.sectionContact, Icons.call_outlined, contactRows);
     }
 
     // Basics
@@ -436,11 +436,12 @@ class _FamilyMemberDetailScreenState
       _valueRow(AppStrings.schoolName, details?.schoolName),
     ];
     if (basicsRows.whereType<Widget>().isNotEmpty) addedDetailSection = true;
-    addSection(AppStrings.sectionWorkSchool, basicsRows);
+    addSection(AppStrings.sectionWorkSchool, Icons.work_outline, basicsRows);
 
     // Health
     if (healthPrivate) {
-      addSection(AppStrings.tabHealth, [_privateBanner()]);
+      addSection(AppStrings.tabHealth, Icons.favorite_outline,
+          [_privateBanner()]);
     } else {
       final healthRows = [
         _valueRow(AppStrings.bloodGroup, details?.bloodGroup),
@@ -452,24 +453,24 @@ class _FamilyMemberDetailScreenState
         _valueRow(AppStrings.foodAllergies, details?.foodAllergies),
       ];
       if (healthRows.whereType<Widget>().isNotEmpty) addedDetailSection = true;
-      addSection(AppStrings.tabHealth, healthRows);
+      addSection(AppStrings.tabHealth, Icons.favorite_outline, healthRows);
     }
 
-    // Medicine schedules (family members only)
+    // Medicine (recurring reminders) — family members only
     if (!widget.profileMode) {
       children.add(
-        MedicineSchedulesSection(
+        FamilyMedicineSection(
           familyMemberId: member.id,
-          householdId: member.householdId,
           canEdit: canEdit,
         ),
       );
-      children.add(const SizedBox(height: 20));
+      children.add(const SizedBox(height: 12));
     }
 
     // Emergency
     if (emergencyPrivate) {
-      addSection(AppStrings.tabEmergency, [_privateBanner()]);
+      addSection(AppStrings.tabEmergency, Icons.emergency_outlined,
+          [_privateBanner()]);
     } else {
       final emergencyRows = [
         _valueRow(
@@ -489,7 +490,8 @@ class _FamilyMemberDetailScreenState
       if (emergencyRows.whereType<Widget>().isNotEmpty) {
         addedDetailSection = true;
       }
-      addSection(AppStrings.tabEmergency, emergencyRows);
+      addSection(AppStrings.tabEmergency, Icons.emergency_outlined,
+          emergencyRows);
     }
 
     // Clothing sizes
@@ -508,7 +510,7 @@ class _FamilyMemberDetailScreenState
       ),
     ];
     if (sizeRows.whereType<Widget>().isNotEmpty) addedDetailSection = true;
-    addSection(AppStrings.clothingSizes, sizeRows);
+    addSection(AppStrings.clothingSizes, Icons.checkroom_outlined, sizeRows);
 
     // Income (family members only)
     if (!widget.profileMode) {
@@ -653,9 +655,41 @@ class _FamilyMemberDetailScreenState
     required FamilyMemberDetails? details,
     required String? subtitle,
     required HouseholdMember? membership,
+    required String? email,
   }) {
     final theme = Theme.of(context);
-    return Center(
+    final onPrimary = theme.colorScheme.onPrimary;
+
+    final chips = <Widget>[];
+    final dob = details?.dateOfBirth ?? member.dateOfBirth;
+    final age = dob == null ? null : _ageFromDob(dob);
+    if (age != null) chips.add(_headerChip(Icons.cake_outlined, '$age yrs'));
+    final blood = details?.bloodGroup?.trim() ?? '';
+    if (blood.isNotEmpty) {
+      chips.add(_headerChip(Icons.bloodtype_outlined, blood));
+    }
+    final diet = _dietLabel(details?.dietaryPreference);
+    if (diet.isNotEmpty) {
+      chips.add(_headerChip(Icons.restaurant_outlined, diet));
+    }
+    if (membership != null) {
+      chips.add(_headerChip(Icons.shield_outlined, roleLabel(membership.role)));
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary,
+            theme.colorScheme.primary.withOpacity(0.72),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Column(
         children: [
           MemberAvatarPicker(
@@ -669,7 +703,8 @@ class _FamilyMemberDetailScreenState
           const SizedBox(height: 12),
           Text(
             member.listLabel,
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: onPrimary,
               fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,
@@ -679,54 +714,111 @@ class _FamilyMemberDetailScreenState
             Text(
               subtitle,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: onPrimary.withOpacity(0.85),
               ),
               textAlign: TextAlign.center,
             ),
           ],
-          if (membership != null) ...[
-            const SizedBox(height: 8),
-            MemberRoleBadge(role: membership.role),
+          if (chips.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: chips,
+            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _privateBanner() {
-    return Card(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(
-              Icons.lock_outline,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget _headerChip(IconData icon, String label) {
+    final onPrimary = Theme.of(context).colorScheme.onPrimary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: onPrimary.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: onPrimary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: onPrimary,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                AppStrings.sectionPrivate,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _sectionTitle(String title) {
+  int? _ageFromDob(DateTime dob) {
+    final now = DateTime.now();
+    var age = now.year - dob.year;
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
+      age -= 1;
+    }
+    return age < 0 ? null : age;
+  }
+
+  Widget _privateBanner() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
+      child: Row(
+        children: [
+          Icon(
+            Icons.lock_outline,
+            size: 18,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              AppStrings.sectionPrivate,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionCard(String title, IconData icon, List<Widget> rows) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...rows,
+          ],
+        ),
       ),
     );
   }
@@ -734,19 +826,30 @@ class _FamilyMemberDetailScreenState
   Widget? _valueRow(String label, String? value) {
     final text = value?.trim() ?? '';
     if (text.isEmpty) return null;
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 116,
             child: Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
-          Expanded(child: Text(text)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );

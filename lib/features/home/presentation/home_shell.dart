@@ -3,86 +3,126 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/strings/app_strings.dart';
-import '../../../shared/constants/nav_features.dart';
 import '../../../shared/widgets/offline_banner.dart';
-import '../../household/data/household_settings_repository.dart';
+import 'app_drawer.dart';
 
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
+  static const _tabs = <_NavTab>[
+    _NavTab(
+      icon: Icons.dashboard_outlined,
+      selectedIcon: Icons.dashboard,
+      label: AppStrings.navDashboard,
+    ),
+    _NavTab(
+      icon: Icons.inventory_2_outlined,
+      selectedIcon: Icons.inventory_2,
+      label: AppStrings.navInventory,
+    ),
+    _NavTab(
+      icon: Icons.event_note_outlined,
+      selectedIcon: Icons.event_note,
+      label: AppStrings.navPlans,
+    ),
+    _NavTab(
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home,
+      label: AppStrings.navHome,
+    ),
+  ];
+
+  void _goBranch(int branchIndex) {
+    navigationShell.goBranch(
+      branchIndex,
+      initialLocation: branchIndex == navigationShell.currentIndex,
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final modules = ref.watch(enabledModulesProvider);
-    final barFeatures = NavFeatures.bottomBarFeatures(modules);
-    final showMore = NavFeatures.showMoreTab(modules);
-
-    final tabs = <_NavTab>[
-      const _NavTab(
-        branchIndex: NavFeatures.homeBranchIndex,
-        destination: NavigationDestination(
-          icon: Icon(Icons.home_outlined),
-          selectedIcon: Icon(Icons.home),
-          label: AppStrings.navHome,
-        ),
-      ),
-      ...barFeatures.map(
-        (feature) => _NavTab(
-          branchIndex: feature.branchIndex,
-          destination: NavigationDestination(
-            icon: Icon(feature.icon),
-            selectedIcon: Icon(feature.selectedIcon),
-            label: feature.label,
-          ),
-        ),
-      ),
-      if (showMore)
-        const _NavTab(
-          branchIndex: NavFeatures.moreBranchIndex,
-          destination: NavigationDestination(
-            icon: Icon(Icons.more_horiz_outlined),
-            selectedIcon: Icon(Icons.more_horiz),
-            label: AppStrings.navMore,
-          ),
-        ),
-    ];
-
-    var selectedIndex = tabs.indexWhere(
-      (t) => t.branchIndex == navigationShell.currentIndex,
-    );
-    if (selectedIndex < 0) selectedIndex = 0;
+    final theme = Theme.of(context);
+    final current = navigationShell.currentIndex;
 
     return Scaffold(
+      key: rootScaffoldKey,
+      drawer: const AppDrawer(),
       body: OfflineBanner(child: navigationShell),
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: theme.colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).shadowColor.withOpacity(0.12),
+              color: theme.shadowColor.withOpacity(0.12),
               blurRadius: 10,
               offset: const Offset(0, -3),
             ),
             BoxShadow(
-              color: Theme.of(context).shadowColor.withOpacity(0.06),
+              color: theme.shadowColor.withOpacity(0.06),
               blurRadius: 20,
               offset: const Offset(0, -8),
             ),
           ],
         ),
-        child: NavigationBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          selectedIndex: selectedIndex,
-          onDestinationSelected: (index) {
-            final tab = tabs[index];
-            navigationShell.goBranch(
-              tab.branchIndex,
-              initialLocation: tab.branchIndex == navigationShell.currentIndex,
-            );
-          },
-          destinations: tabs.map((t) => t.destination).toList(),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 64,
+            child: Row(
+              children: [
+                for (var i = 0; i < _tabs.length; i++)
+                  _NavItem(
+                    tab: _tabs[i],
+                    selected: current == i,
+                    onTap: () => _goBranch(i),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.tab,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _NavTab tab;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = selected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(selected ? tab.selectedIcon : tab.icon, color: color, size: 24),
+            const SizedBox(height: 4),
+            Text(
+              tab.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -91,10 +131,12 @@ class HomeShell extends ConsumerWidget {
 
 class _NavTab {
   const _NavTab({
-    required this.branchIndex,
-    required this.destination,
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
   });
 
-  final int branchIndex;
-  final NavigationDestination destination;
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
 }

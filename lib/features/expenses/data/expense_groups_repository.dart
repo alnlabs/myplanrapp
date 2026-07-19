@@ -88,6 +88,16 @@ class ExpenseGroupsRepository {
     return groupId;
   }
 
+  Future<void> renameGroup(String groupId, String name) async {
+    await _client
+        .from('expense_groups')
+        .update({'name': name}).eq('id', groupId);
+  }
+
+  Future<void> deleteGroup(String groupId) async {
+    await _client.from('expense_groups').delete().eq('id', groupId);
+  }
+
   Future<List<ExpenseGroupBalance>> fetchBalances(String groupId) async {
     final data = await _client.rpc('expense_group_balances', params: {
       'p_group_id': groupId,
@@ -200,6 +210,29 @@ final expenseGroupBalancesProvider =
     FutureProvider.family<List<ExpenseGroupBalance>, String>(
         (ref, groupId) async {
   return ref.watch(expenseGroupsRepositoryProvider).fetchBalances(groupId);
+});
+
+/// The signed-in user's net balance within a group (positive = owed to you,
+/// negative = you owe). Returns null when the user is not a member of the
+/// group or the group has no computable balance yet.
+final expenseGroupMyBalanceProvider =
+    FutureProvider.family<double?, String>((ref, groupId) async {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return null;
+  final members = await ref.watch(expenseGroupMembersProvider(groupId).future);
+  String? myMemberId;
+  for (final m in members) {
+    if (m.userId == userId) {
+      myMemberId = m.id;
+      break;
+    }
+  }
+  if (myMemberId == null) return null;
+  final balances = await ref.watch(expenseGroupBalancesProvider(groupId).future);
+  for (final b in balances) {
+    if (b.groupMemberId == myMemberId) return b.netBalance;
+  }
+  return null;
 });
 
 class GroupExpensesListNotifier

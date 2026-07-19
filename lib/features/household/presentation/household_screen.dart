@@ -6,15 +6,17 @@ import '../../../core/providers/supabase_providers.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/models/family_member.dart';
 import '../../../shared/models/household.dart';
+import '../../../shared/models/medicine_schedule.dart';
 import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/widgets/async_screen_body.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../home/presentation/app_drawer.dart';
 import '../data/family_repository.dart';
 import '../data/household_repository.dart';
+import '../data/medicine_schedule_repository.dart';
 import 'add_family_member_screen.dart';
 import 'family_member_detail_screen.dart';
-import 'household_features_screen.dart';
 import 'member_role_actions.dart';
 import 'member_role_helpers.dart';
 import 'member_avatar_circle.dart';
@@ -124,6 +126,8 @@ class HouseholdScreen extends ConsumerWidget {
         appBar: const FeatureScreenAppBar(
           title: AppStrings.householdTitle,
           subtitle: AppStrings.householdSubtitle,
+          leading: DrawerMenuButton(),
+          implyLeading: false,
         ),
         body: Center(
           child: Padding(
@@ -180,17 +184,9 @@ class HouseholdScreen extends ConsumerWidget {
       appBar: FeatureScreenAppBar(
         title: AppStrings.householdTitle,
         subtitle: AppStrings.householdSubtitle,
+        leading: const DrawerMenuButton(),
+        implyLeading: false,
         actions: [
-          if (isOwner)
-            IconButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const HouseholdFeaturesScreen(),
-                ),
-              ),
-              icon: const Icon(Icons.tune_outlined),
-              tooltip: AppStrings.featureSettings,
-            ),
           if (isManager)
             IconButton(
               onPressed: () => _openAddMember(context),
@@ -226,6 +222,55 @@ class HouseholdScreen extends ConsumerWidget {
               rosterAsync: rosterAsync,
               isManager: isManager,
               onAdd: () => _openAddMember(context),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              AppStrings.familyDashboardTitle,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              AppStrings.familyDashboardHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            AsyncScreenBody(
+              value: rosterAsync,
+              onRetry: () => ref.invalidate(familyRosterProvider),
+              isEmpty: (roster) => roster.isEmpty,
+              emptyTitle: AppStrings.emptyFamilyRoster,
+              emptySubtitle: AppStrings.emptyFamilyRosterHint,
+              emptyActionLabel:
+                  isManager ? AppStrings.addFamilyMember : null,
+              onEmptyAction:
+                  isManager ? () => _openAddMember(context) : null,
+              builder: (roster) {
+                return Column(
+                  children: roster
+                      .map(
+                        (m) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _MemberDashboardCard(
+                            member: m,
+                            members: members,
+                            isOwner: isOwner,
+                            currentUserId: currentUserId,
+                            householdId: household?.id,
+                            onChangeRole: (userId, role) => _changeRole(
+                              context,
+                              ref,
+                              householdId: household!.id,
+                              userId: userId,
+                              role: role,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
             ),
             if (isOwner) ...[
               const SizedBox(height: 24),
@@ -340,48 +385,6 @@ class HouseholdScreen extends ConsumerWidget {
                 },
               ),
             ],
-            const SizedBox(height: 24),
-            Text(
-              AppStrings.householdTitle,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
-            AsyncScreenBody(
-              value: rosterAsync,
-              onRetry: () => ref.invalidate(familyRosterProvider),
-              isEmpty: (roster) => roster.isEmpty,
-              emptyTitle: AppStrings.emptyFamilyRoster,
-              emptySubtitle: AppStrings.emptyFamilyRosterHint,
-              emptyActionLabel:
-                  isManager ? AppStrings.addFamilyMember : null,
-              onEmptyAction:
-                  isManager ? () => _openAddMember(context) : null,
-              builder: (roster) {
-                return Column(
-                  children: roster
-                      .map(
-                        (m) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _MemberTile(
-                            member: m,
-                            members: members,
-                            isOwner: isOwner,
-                            currentUserId: currentUserId,
-                            householdId: household?.id,
-                            onChangeRole: (userId, role) => _changeRole(
-                              context,
-                              ref,
-                              householdId: household!.id,
-                              userId: userId,
-                              role: role,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                );
-              },
-            ),
           ],
         ),
       ),
@@ -588,8 +591,8 @@ class _RoleTile extends StatelessWidget {
   }
 }
 
-class _MemberTile extends ConsumerWidget {
-  const _MemberTile({
+class _MemberDashboardCard extends ConsumerWidget {
+  const _MemberDashboardCard({
     required this.member,
     required this.members,
     required this.isOwner,
@@ -619,6 +622,32 @@ class _MemberTile extends ConsumerWidget {
           targetRole: appRole,
         );
 
+    final medicines =
+        ref.watch(medicineSchedulesProvider(member.id)).valueOrNull ??
+            const <MedicineSchedule>[];
+    final activeMedicines = medicines.where((m) => m.isActive).length;
+    final details = ref.watch(familyMemberDetailsProvider(member.id)).valueOrNull;
+    final bloodGroup = details?.bloodGroup?.trim() ?? '';
+    final allergies = details?.allergies?.trim() ?? '';
+
+    final highlights = <Widget>[
+      if (activeMedicines > 0)
+        _InfoChip(
+          icon: Icons.medication_outlined,
+          label: activeMedicines == 1
+              ? AppStrings.oneMedicine
+              : AppStrings.medicinesCount(activeMedicines),
+        ),
+      if (bloodGroup.isNotEmpty)
+        _InfoChip(icon: Icons.bloodtype_outlined, label: bloodGroup),
+      if (allergies.isNotEmpty)
+        const _InfoChip(
+          icon: Icons.warning_amber_outlined,
+          label: AppStrings.allergies,
+          tone: _ChipTone.warning,
+        ),
+    ];
+
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -637,7 +666,7 @@ class _MemberTile extends ConsumerWidget {
                   MemberAvatarCircle(
                     displayName: member.listLabel,
                     avatarPath: member.avatarUrl,
-                    radius: 24,
+                    radius: 26,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -646,29 +675,46 @@ class _MemberTile extends ConsumerWidget {
                       children: [
                         Text(
                           member.listLabel,
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
-                            _Badge(label: member.relationshipLabel),
-                            _Badge(
-                              label: member.isAppMember
-                                  ? AppStrings.appMember
-                                  : AppStrings.profileOnly,
-                              muted: true,
-                            ),
-                            if (appRole != null)
-                              MemberRoleBadge(role: appRole),
-                            if (member.isPendingInvite)
-                              const _Badge(
-                                label: AppStrings.pendingInvite,
-                                highlight: true,
+                        const SizedBox(height: 2),
+                        Text(
+                          member.relationshipLabel,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
-                          ],
                         ),
+                        if (member.isPendingInvite ||
+                            appRole != null ||
+                            !member.isAppMember) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (!member.isAppMember)
+                                const _Badge(
+                                  label: AppStrings.profileOnly,
+                                  muted: true,
+                                ),
+                              if (appRole != null)
+                                MemberRoleBadge(role: appRole),
+                              if (member.isPendingInvite)
+                                const _Badge(
+                                  label: AppStrings.pendingInvite,
+                                  highlight: true,
+                                ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -678,6 +724,10 @@ class _MemberTile extends ConsumerWidget {
                   ),
                 ],
               ),
+              if (highlights.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(spacing: 6, runSpacing: 6, children: highlights),
+              ],
               if (isOwner && member.isRosterOnly && !member.isPendingInvite) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -699,6 +749,54 @@ class _MemberTile extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+enum _ChipTone { neutral, warning }
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    this.tone = _ChipTone.neutral,
+  });
+
+  final IconData icon;
+  final String label;
+  final _ChipTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final bg = tone == _ChipTone.warning
+        ? colorScheme.errorContainer.withOpacity(0.5)
+        : colorScheme.surfaceContainerHighest;
+    final fg = tone == _ChipTone.warning
+        ? colorScheme.onErrorContainer
+        : colorScheme.onSurfaceVariant;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: fg),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: fg,
+            ),
+          ),
+        ],
       ),
     );
   }

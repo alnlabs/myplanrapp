@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-
-import '../utils/shell_navigation.dart';
 
 /// App bar with a compact title and optional subtitle for feature screens.
 class FeatureScreenAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -10,14 +7,16 @@ class FeatureScreenAppBar extends StatelessWidget implements PreferredSizeWidget
     required this.title,
     this.subtitle,
     this.actions,
-    this.showBackToMore = false,
+    this.leading,
     this.implyLeading = true,
   });
 
   final String title;
   final String? subtitle;
   final List<Widget>? actions;
-  final bool showBackToMore;
+
+  /// Optional custom leading widget (e.g. a drawer hamburger).
+  final Widget? leading;
 
   /// When false, no back arrow is shown (e.g. root tab screens).
   final bool implyLeading;
@@ -31,13 +30,8 @@ class FeatureScreenAppBar extends StatelessWidget implements PreferredSizeWidget
     final hasSubtitle = subtitle != null && subtitle!.isNotEmpty;
 
     return AppBar(
-      automaticallyImplyLeading: implyLeading && !showBackToMore,
-      leading: showBackToMore
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.go('/more'),
-            )
-          : null,
+      automaticallyImplyLeading: implyLeading && leading == null,
+      leading: leading,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -72,12 +66,13 @@ class FeatureScreenAppBar extends StatelessWidget implements PreferredSizeWidget
     required String title,
     String? subtitle,
     List<Widget>? actions,
+    Widget? leading,
   }) {
     return FeatureScreenAppBar(
       title: title,
       subtitle: subtitle,
       actions: actions,
-      showBackToMore: openedFromMore(context),
+      leading: leading,
       implyLeading: false,
     );
   }

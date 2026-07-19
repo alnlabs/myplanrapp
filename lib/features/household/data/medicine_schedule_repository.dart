@@ -10,6 +10,7 @@ import '../../auth/data/auth_repository.dart';
 class MedicineReminderToday {
   const MedicineReminderToday({
     required this.scheduleId,
+    required this.familyMemberId,
     required this.timeIndex,
     required this.displayTitle,
     required this.memberName,
@@ -18,6 +19,7 @@ class MedicineReminderToday {
   });
 
   final String scheduleId;
+  final String familyMemberId;
   final int timeIndex;
   final String displayTitle;
   final String memberName;
@@ -46,6 +48,16 @@ class MedicineScheduleRepository {
         .toList();
   }
 
+  Future<MedicineSchedule?> fetchScheduleById(String id) async {
+    final data = await _client
+        .from('member_medicine_schedules')
+        .select(_select)
+        .eq('id', id)
+        .maybeSingle();
+    if (data == null) return null;
+    return MedicineSchedule.fromJson(data);
+  }
+
   Future<List<MedicineSchedule>> fetchSchedulesForReminders(
     String householdId,
   ) async {
@@ -63,10 +75,25 @@ class MedicineScheduleRepository {
         .toList();
   }
 
+  /// All active schedules for the household, regardless of who is notified.
+  /// Used by the dashboard so every family member's medicine is visible.
+  Future<List<MedicineSchedule>> fetchAllActiveSchedules(
+    String householdId,
+  ) async {
+    final data = await _client
+        .from('member_medicine_schedules')
+        .select(_select)
+        .eq('household_id', householdId)
+        .eq('is_active', true);
+    return (data as List)
+        .map((e) => MedicineSchedule.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<MedicineReminderToday>> fetchTodayReminders(
     String householdId,
   ) async {
-    final schedules = await fetchSchedulesForReminders(householdId);
+    final schedules = await fetchAllActiveSchedules(householdId);
     final items = <MedicineReminderToday>[];
 
     for (final schedule in schedules) {
@@ -78,6 +105,7 @@ class MedicineScheduleRepository {
         items.add(
           MedicineReminderToday(
             scheduleId: schedule.id,
+            familyMemberId: schedule.familyMemberId,
             timeIndex: i,
             displayTitle: schedule.displayTitle,
             memberName: memberName,

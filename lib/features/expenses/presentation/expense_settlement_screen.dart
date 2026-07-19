@@ -60,6 +60,15 @@ class _ExpenseSettlementScreenState extends ConsumerState<ExpenseSettlementScree
     String? toId;
     final amountController = TextEditingController();
     final noteController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    double netFor(String? memberId) {
+      if (memberId == null) return 0;
+      for (final b in balances) {
+        if (b.groupMemberId == memberId) return b.netBalance;
+      }
+      return 0;
+    }
 
     final saved = await showDialog<bool>(
       context: context,
@@ -67,53 +76,76 @@ class _ExpenseSettlementScreenState extends ConsumerState<ExpenseSettlementScree
         builder: (context, setDialogState) => AlertDialog(
           title: const Text(AppStrings.recordSettlement),
           content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  value: fromId,
-                  decoration:
-                      const InputDecoration(labelText: AppStrings.settlementFrom),
-                  items: members
-                      .map(
-                        (m) => DropdownMenuItem(
-                          value: m.id,
-                          child: Text(m.displayName),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setDialogState(() => fromId = v),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: toId,
-                  decoration:
-                      const InputDecoration(labelText: AppStrings.settlementTo),
-                  items: members
-                      .map(
-                        (m) => DropdownMenuItem(
-                          value: m.id,
-                          child: Text(m.displayName),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setDialogState(() => toId = v),
-                ),
-                const SizedBox(height: 12),
-                AppTextField(
-                  controller: amountController,
-                  label: AppStrings.amount,
-                  prefixText: '₹ ',
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: Validators.positiveAmount,
-                ),
-                const SizedBox(height: 12),
-                AppTextField(
-                  controller: noteController,
-                  label: AppStrings.note,
-                ),
-              ],
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: fromId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                        labelText: AppStrings.settlementFrom),
+                    items: members
+                        .map(
+                          (m) => DropdownMenuItem(
+                            value: m.id,
+                            child: Text(m.displayName),
+                          ),
+                        )
+                        .toList(),
+                    validator: (v) =>
+                        v == null ? AppStrings.requiredField : null,
+                    onChanged: (v) => setDialogState(() => fromId = v),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: toId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                        labelText: AppStrings.settlementTo),
+                    items: members
+                        .map(
+                          (m) => DropdownMenuItem(
+                            value: m.id,
+                            child: Text(m.displayName),
+                          ),
+                        )
+                        .toList(),
+                    validator: (v) {
+                      if (v == null) return AppStrings.requiredField;
+                      if (v == fromId) return AppStrings.settlementSameMember;
+                      return null;
+                    },
+                    onChanged: (v) => setDialogState(() => toId = v),
+                  ),
+                  const SizedBox(height: 12),
+                  AppTextField(
+                    controller: amountController,
+                    label: AppStrings.amount,
+                    prefixText: '₹ ',
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) {
+                      final base = Validators.positiveAmount(value);
+                      if (base != null) return base;
+                      // Mirror the DB rule: the payer must actually owe, and the
+                      // amount cannot exceed what they owe.
+                      final owed = -netFor(fromId);
+                      final amount = double.tryParse(value!.trim()) ?? 0;
+                      if (owed <= 0.01 || amount > owed + 0.01) {
+                        return AppStrings.settlementExceedsOwed;
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  AppTextField(
+                    controller: noteController,
+                    label: AppStrings.note,
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -122,7 +154,10 @@ class _ExpenseSettlementScreenState extends ConsumerState<ExpenseSettlementScree
               child: const Text(AppStrings.cancel),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () {
+                if (formKey.currentState?.validate() != true) return;
+                Navigator.pop(context, true);
+              },
               child: const Text(AppStrings.save),
             ),
           ],

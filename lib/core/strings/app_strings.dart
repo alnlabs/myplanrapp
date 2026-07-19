@@ -3,12 +3,25 @@ abstract final class AppStrings {
 
   // Nav
   static const navHome = 'Home';
+  static const navDashboard = 'Dashboard';
+  static const navAdd = 'Add';
   static const navPantry = 'Pantry';
   static const navInventory = 'Pantry';
   static const navPlans = 'Plans';
   static const navExpenses = 'Expenses';
   static const navShop = 'Shop';
   static const navMore = 'More';
+
+  // Add sheet + drawer
+  static const addSheetTitle = 'Add';
+  static const addMeal = 'Add meal';
+  static const addShoppingItem = 'Add to shopping list';
+  static const drawerSectionInfo = 'Help & info';
+  static const helpInfoTitle = 'Help & info';
+  static const helpInfoHint = 'Feedback, about, and privacy';
+  static const drawerHelpAbout = 'Help & about';
+  static const drawerReceipts = 'Saved receipts';
+  static const drawerReceiptsHint = 'History of scanned receipts';
   static const moreSubtitle = 'Family, settings, and more features';
   static const moreFeatureOverflowHint = 'Open feature';
   static const moreSectionFeatures = 'Features';
@@ -27,6 +40,7 @@ abstract final class AppStrings {
   static const settingsAccountSection = 'Account';
   static const settingsAppearanceSection = 'Appearance';
   static const settingsNotificationsSection = 'Notifications';
+  static const settingsDataSection = 'Data';
   static const settingsSupportSection = 'Support';
   static const settingsLegalSection = 'Legal';
   static const settingsAboutSection = 'About';
@@ -191,7 +205,7 @@ abstract final class AppStrings {
   static const emptyExpenses = 'No expenses yet';
   static const emptyExpensesHint = 'Track rent, groceries, bills and more';
   static const expenseAdded = 'Expense added';
-  static const summaryTitle = 'Monthly summary';
+  static const summaryTitle = 'Expense summary';
   static const addIncome = 'Add income';
   static const editIncome = 'Edit income';
   static const incomeMember = 'Family member';
@@ -203,11 +217,59 @@ abstract final class AppStrings {
   static const filterAllMoney = 'All';
   static const filterExpensesOnly = 'Expenses';
   static const filterIncomeOnly = 'Income';
+  static const viewMoneyAll = 'All';
+  static const viewMoneyPersonal = 'Personal';
+  static const viewMoneyHousehold = 'Household';
+  static const viewMoneyGroups = 'Groups';
+  static const viewMoneyAllHint = 'Everything you can see';
+  static const viewMoneyPersonalHint = 'Private to you';
+  static const viewMoneyHouseholdHint = 'Shared with your household';
+  static const viewMoneyGroupsHint = 'Shared spending with people';
+  static const scopeLabel = 'Visibility';
+  static const scopePersonal = 'Personal';
+  static const scopeHousehold = 'Household';
+  static const scopePersonalHint = 'Only you can see this';
+  static const scopeHouseholdHint = 'Shared with your household';
+  static const balancesAndSettle = 'Balances & settle';
+  static const manageGroups = 'Manage groups';
+  static const newGroup = 'New group';
+  static const renameGroup = 'Rename group';
+  static const deleteGroup = 'Delete group';
+  static const deleteGroupConfirm =
+      'Delete this group? Its expenses stay, but split and balance history are removed. This cannot be undone.';
+  static const groupsHubHint =
+      'Track shared spending with family and friends.';
+  static const balanceYouAreOwed = "You're owed";
+  static const balanceYouOwe = 'You owe';
+  static const balanceSettledUp = 'Settled up';
+  static String membersCount(int count) =>
+      count == 1 ? '1 member' : '$count members';
   static const filterByMember = 'Member';
   static const moneySpent = 'Spent';
   static const moneyEarned = 'Earned';
   static const moneyNet = 'Net';
   static const earnedByMember = 'Earned by member';
+  static const spendingComparison = 'Spending comparison';
+  static const comparedYesterday = 'vs yesterday';
+  static const comparedLastWeek = 'vs last week';
+  static const comparedLastMonth = 'vs last month';
+  static const comparedPrevPeriod = 'vs previous period';
+  static const prevYesterday = 'Yesterday';
+  static const prevLastWeek = 'Last week';
+  static const prevLastMonth = 'Last month';
+  static const prevPeriodNoun = 'Previous period';
+  static const comparisonNoPrevious = 'No spending in the previous period';
+  static const comparisonNoChange = 'No change';
+  static const viewType = 'View';
+  static const viewDay = 'Day';
+  static const viewWeek = 'Week';
+  static const viewMonth = 'Month';
+  static const viewCustom = 'Custom';
+  static const spendingTrend = 'Spending trend';
+  static const last7Days = 'Last 7 days';
+  static const last7Weeks = 'Last 7 weeks';
+  static const last7Months = 'Last 7 months';
+  static const last7Periods = 'Last 7 periods';
   static const moneyPeriodLabel = 'Period';
   static const transactionsTitle = 'Transactions';
   static const filterList = 'Filter';
@@ -257,12 +319,15 @@ abstract final class AppStrings {
   static const guestEmailOptional = 'Guest email (optional)';
   static const expenseGroup = 'Group';
   static const noGroup = 'Household (no group)';
-  static const paidByMember = 'Paid by';
+  static const paidByMember = 'Who paid?';
+  static const paidByHint = 'The person who paid the full amount';
   static const splitType = 'Split type';
   static const splitEqual = 'Equal';
   static const splitExact = 'Exact amounts';
   static const splitPercent = 'Percent';
   static const participants = 'Participants';
+  static const splitBetween = 'Split between';
+  static const splitBetweenHint = 'Everyone who shares this expense';
   static const settlements = 'Settlements';
   static const recordSettlement = 'Record settlement';
   static const suggestedSettlements = 'Suggested transfers';
@@ -272,8 +337,11 @@ abstract final class AppStrings {
   static const emptyExpenseGroups = 'No expense groups yet';
   static const emptyExpenseGroupsHint =
       'Create groups to track shared trips, roommates, or categories';
-  static const settlementFrom = 'From';
-  static const settlementTo = 'To';
+  static const settlementFrom = 'From (pays)';
+  static const settlementTo = 'To (receives)';
+  static const settlementSameMember = 'Choose two different members';
+  static const settlementExceedsOwed =
+      'Amount is more than what this member owes';
   static const sharedGroupMinMembers = 'Shared groups need at least 2 members';
   static const splitSumMismatch = 'Split amounts must equal the expense total';
   static const recurringExpenses = 'Recurring expenses';
@@ -322,7 +390,13 @@ abstract final class AppStrings {
 
   // Household & auth
   static const householdTitle = 'Family';
-  static const householdSubtitle = 'Family roster and feature settings';
+  static const familyDashboardTitle = 'Family at a glance';
+  static const familyDashboardHint =
+      'Key info for each member — tap to see full profile';
+  static const tagMe = 'Me';
+  static const oneMedicine = '1 medicine';
+  static String medicinesCount(int count) => '$count medicines';
+  static const householdSubtitle = 'Everyone in your home';
   static const createHousehold = 'Create family';
   static const joinHousehold = 'Join family';
   static const householdName = 'Family name';
@@ -431,6 +505,8 @@ abstract final class AppStrings {
   static const timesPerDayHint = 'Add at least one reminder time';
   static const addReminderTime = 'Add time';
   static const noMedicineSchedules = 'No medicine schedules yet.';
+  static const addMedicine = 'Add medicine';
+  static const medicineMemberRequired = 'Choose who this medicine is for';
   static const medicineToday = 'Medicine today';
   static const invalidScheduleTime = 'Use times like 08:00 or 8:00 PM';
   static const active = 'Active';
@@ -863,6 +939,12 @@ abstract final class AppStrings {
   static const optional = 'Optional';
   static String addedBy(String name) => 'Added by $name';
   static const quickActions = 'Quick actions';
+  static const dashboardExpensesCard = 'Spending summary';
+  static const menu = 'Menu';
+  static const customizeDashboard = 'Customize dashboard';
+  static const customizeDashboardHint = 'Turn dashboard cards on or off';
+  static const customizeDashboardEmpty =
+      'No cards available for your enabled features.';
   static const quickActionPlan = 'Plan';
   static const quickActionPantry = 'Pantry';
   static const quickActionPantryHint = 'Track stock at home';

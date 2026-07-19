@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/supabase_providers.dart';
 import '../../../core/providers/theme_mode_provider.dart';
 import '../../../core/strings/app_strings.dart';
+import '../../../shared/providers/record_permissions.dart';
 import '../../../shared/utils/legal_launcher.dart';
 import '../../alerts/services/notification_service.dart';
 import '../../app_updates/services/app_review_service.dart';
@@ -140,6 +141,7 @@ class SettingsScreen extends ConsumerWidget {
     final notificationsEnabled = ref.watch(notificationsEnabledProvider);
     final profileAsync = ref.watch(userProfileProvider);
     final email = ref.watch(supabaseClientProvider).auth.currentUser?.email;
+    final isOwner = ref.watch(isHouseholdOwnerProvider);
 
     return Scaffold(
       appBar: const FeatureScreenAppBar(
@@ -257,6 +259,20 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
           ),
+          if (isOwner) ...[
+            const Divider(height: 1),
+            const _SectionHeader(title: AppStrings.settingsDataSection),
+            ListTile(
+              leading: Icon(
+                Icons.restart_alt_outlined,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: const Text(AppStrings.resetDataTitle),
+              subtitle: const Text(AppStrings.moreResetHint),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/reset-data'),
+            ),
+          ],
           const Divider(height: 1),
           const _SectionHeader(title: AppStrings.settingsSupportSection),
           ListTile(

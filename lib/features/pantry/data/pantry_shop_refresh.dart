@@ -1,8 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../household/data/household_settings_repository.dart';
 import '../../shopping/data/shopping_list_provider.dart';
-import '../utils/pantry_shop_refresh_policy.dart';
 import 'pantry_items_list_provider.dart';
 import 'pantry_repository.dart';
 
@@ -17,13 +15,10 @@ Future<void> refreshPantryListAndAlerts(WidgetRef ref) async {
   invalidatePantryAlerts(ref);
 }
 
-/// After stock quantity changes — sync shop only when shopping module is on.
+/// After stock quantity changes — sync the shared shopping list.
 Future<void> refreshPantryAfterStockChange(WidgetRef ref) async {
   await refreshPantryListAndAlerts(ref);
-  final modules = ref.read(enabledModulesProvider);
-  if (shouldSyncShopAfterPantryChange(modules)) {
-    await refreshShopFromPantry(ref);
-  }
+  await refreshShopFromPantry(ref);
 }
 
 /// Call after pantry mutations that affect shop low-stock / attention rows.

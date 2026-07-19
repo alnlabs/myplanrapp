@@ -8,6 +8,7 @@ import '../../../shared/utils/offline_guard.dart';
 import '../../auth/data/auth_repository.dart';
 import 'expense_date_filter_provider.dart';
 import 'expense_repository.dart';
+import 'expense_view_provider.dart';
 import 'money_list_filter_provider.dart';
 import 'recurring_money_rule_repository.dart';
 
@@ -26,6 +27,7 @@ class ExpensesListNotifier extends PaginatedListNotifier<Expense> {
   ) {
     final filters = ref.read(moneyListFilterProvider);
     final range = ref.read(expenseDateRangeProvider);
+    final view = ref.read(expenseViewProvider);
     return ref.read(expenseRepositoryProvider).fetchExpensesPage(
           householdId,
           offset: offset,
@@ -34,7 +36,8 @@ class ExpensesListNotifier extends PaginatedListNotifier<Expense> {
           familyMemberId: filters.familyMemberId,
           startDate: range.start,
           endDate: range.end,
-          groupId: filters.groupId,
+          groupId: view.groupFilterId,
+          scope: view.scope,
         );
   }
 }

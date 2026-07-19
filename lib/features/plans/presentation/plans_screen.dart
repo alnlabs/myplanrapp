@@ -20,7 +20,10 @@ import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../../../shared/widgets/filter_menu_button.dart';
 import '../../../shared/widgets/list_display_mode_toggle.dart';
 import '../../../shared/widgets/paginated_list_footer.dart';
+import '../../home/presentation/app_drawer.dart';
+import '../../household/data/medicine_schedule_repository.dart';
 import '../../reminders/data/reminder_repository.dart';
+import '../../reminders/presentation/medicine_reminder_form_screen.dart';
 import '../../reminders/presentation/reminder_form_screen.dart';
 import '../data/plans_list_provider.dart';
 import '../data/todo_reminders_filter.dart';
@@ -127,6 +130,11 @@ class _PlansScreenState extends ConsumerState<PlansScreen> {
               title: const Text(AppStrings.addReminder),
               onTap: () => Navigator.pop(context, _AddChoice.reminder),
             ),
+            ListTile(
+              leading: const Icon(Icons.medication_outlined),
+              title: const Text(AppStrings.addMedicine),
+              onTap: () => Navigator.pop(context, _AddChoice.medicine),
+            ),
           ],
         ),
       ),
@@ -141,6 +149,13 @@ class _PlansScreenState extends ConsumerState<PlansScreen> {
         final saved = await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
             builder: (_) => const ReminderFormScreen(),
+          ),
+        );
+        if (saved == true) await _refresh();
+      case _AddChoice.medicine:
+        final saved = await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (_) => const MedicineReminderFormScreen(),
           ),
         );
         if (saved == true) await _refresh();
@@ -159,6 +174,7 @@ class _PlansScreenState extends ConsumerState<PlansScreen> {
         context,
         title: AppStrings.plansTitle,
         subtitle: AppStrings.plansSubtitle,
+        leading: const DrawerMenuButton(),
         actions: [
           const ListDisplayModeToggle(screenKey: ListDisplayModeKeys.plans),
           FilterMenuButton<TodoRemindersFilter>(
@@ -350,6 +366,7 @@ class _PlansScreenState extends ConsumerState<PlansScreen> {
             ),
             PaginatedListFooter(
               state: listState,
+              idleHeight: 0,
               onRetryLoadMore: () =>
                   ref.read(plansListProvider.notifier).loadMore(),
             ),
@@ -427,6 +444,20 @@ class _PlansScreenState extends ConsumerState<PlansScreen> {
       return;
     }
 
+    if (item.sourceType == ReminderSourceType.medicine) {
+      final schedule = await ref
+          .read(medicineScheduleRepositoryProvider)
+          .fetchScheduleById(item.sourceId);
+      if (!mounted || schedule == null) return;
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          builder: (_) => MedicineReminderFormScreen(existing: schedule),
+        ),
+      );
+      if (saved == true) await _refresh();
+      return;
+    }
+
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => ReminderFormScreen(linkedItem: item),
@@ -464,7 +495,7 @@ class _PlansScreenState extends ConsumerState<PlansScreen> {
   }
 }
 
-enum _AddChoice { plan, reminder }
+enum _AddChoice { plan, reminder, medicine }
 
 class _PlansGrid extends StatelessWidget {
   const _PlansGrid({required this.plans, required this.footer});

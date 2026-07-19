@@ -20,7 +20,7 @@ import '../../features/expenses/presentation/expenses_screen.dart';
 import '../../features/expenses/presentation/recurring_expenses_screen.dart';
 import '../../features/home/presentation/dashboard_screen.dart';
 import '../../features/home/presentation/home_shell.dart';
-import '../../features/home/presentation/more_screen.dart';
+import '../../features/household/presentation/household_screen.dart';
 import '../../features/household/presentation/household_setup_screen.dart';
 import '../../features/household/presentation/setup_wizard_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
@@ -238,6 +238,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/expenses/recurring/add',
         builder: (_, __) => const AddRecurringExpenseScreen(),
       ),
+      // Secondary features reachable from the sidebar drawer (no bottom bar).
+      GoRoute(
+        path: '/expenses',
+        builder: (_, __) => const ExpensesScreen(),
+      ),
+      GoRoute(
+        path: '/subscriptions',
+        builder: (_, __) => const SubscriptionsScreen(),
+      ),
+      GoRoute(
+        path: '/shop',
+        builder: (_, __) => const ShoppingScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return HomeShell(navigationShell: navigationShell);
@@ -284,32 +297,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/expenses',
-                builder: (_, __) => const ExpensesScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/subscriptions',
-                builder: (_, __) => const SubscriptionsScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/shop',
-                builder: (_, __) => const ShoppingScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/more',
-                builder: (_, __) => const MoreScreen(),
+                path: '/family',
+                builder: (_, __) => const HouseholdScreen(),
               ),
             ],
           ),

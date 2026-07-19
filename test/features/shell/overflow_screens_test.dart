@@ -74,7 +74,7 @@ void main() {
         );
       });
 
-      expect(find.text(AppStrings.quickActions), findsOneWidget);
+      expect(find.byType(DashboardScreen), findsOneWidget);
     });
 
     testWidgets('household member tile avoids overflow with long names',

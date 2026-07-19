@@ -1,8 +1,11 @@
+import 'expense.dart';
+
 class RecurringMoneyRule {
   const RecurringMoneyRule({
     required this.id,
     required this.householdId,
     required this.entryType,
+    this.scope = MoneyScope.household,
     required this.title,
     required this.amount,
     required this.categoryId,
@@ -32,6 +35,7 @@ class RecurringMoneyRule {
   final String id;
   final String householdId;
   final String entryType;
+  final MoneyScope scope;
   final String title;
   final double amount;
   final String categoryId;
@@ -89,6 +93,7 @@ class RecurringMoneyRule {
       id: json['id'] as String,
       householdId: json['household_id'] as String,
       entryType: json['entry_type'] as String? ?? 'income',
+      scope: MoneyScope.fromDb(json['scope'] as String?),
       title: json['title'] as String,
       amount: (json['amount'] as num).toDouble(),
       categoryId: json['category_id'] as String,

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/providers/supabase_providers.dart';
 import '../../../shared/models/expense.dart';
+import '../../../shared/models/expense_group.dart';
 import '../../../shared/models/family_member.dart';
 import '../../../shared/models/recurring_money_rule.dart';
 import '../../../shared/providers/list_display_mode_provider.dart';
@@ -16,7 +17,6 @@ import '../../../shared/utils/offline_guard.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/error_view.dart';
-import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../../../shared/widgets/list_display_mode_toggle.dart';
 import '../../../shared/widgets/compact_grid_card.dart';
 import '../../../shared/widgets/list_grid_layout.dart';
@@ -28,6 +28,7 @@ import '../data/expense_date_filter.dart';
 import '../data/expense_date_filter_provider.dart';
 import '../data/expense_groups_repository.dart';
 import '../data/expense_repository.dart';
+import '../data/expense_view_provider.dart';
 import '../data/expenses_list_provider.dart';
 import '../data/money_list_filter_provider.dart';
 import '../data/recurring_money_rule_repository.dart';
@@ -63,6 +64,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final view = ref.watch(expenseViewProvider);
     final listState = ref.watch(expensesListProvider);
     final moneySummaryAsync = ref.watch(moneySummaryProvider);
     final memberIncomeAsync = ref.watch(memberIncomeSummaryProvider);
@@ -71,12 +73,13 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         ref.watch(listDisplayModeProvider(ListDisplayModeKeys.expenses));
     final dueIncomeAsync = ref.watch(dueRecurringIncomeProvider);
     final dueExpenseAsync = ref.watch(dueRecurringExpenseProvider);
+    final isGroupsHub = view.kind == ExpenseViewKind.groups;
 
     return Scaffold(
-      appBar: FeatureScreenAppBar.forShellRoute(
-        context,
-        title: AppStrings.expensesTitle,
-        subtitle: AppStrings.expensesSubtitle,
+      appBar: AppBar(
+        titleSpacing: 8,
+        toolbarHeight: 64,
+        title: const _ViewMenuButton(),
         actions: [
           IconButton(
             onPressed: () => Navigator.of(context).push(
@@ -94,8 +97,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
             onSelected: (value) {
               if (value == 'recurring') {
                 context.push('/expenses/recurring');
-              } else if (value == 'groups') {
-                context.push('/expenses/groups');
               } else if (value == 'export') {
                 _exportReport(context, ref);
               }
@@ -110,14 +111,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                 ),
               ),
               PopupMenuItem<String>(
-                value: 'groups',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.groups_outlined),
-                  title: Text(AppStrings.expenseGroupsTitle),
-                ),
-              ),
-              PopupMenuItem<String>(
                 value: 'export',
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -129,28 +122,36 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await refreshExpensesData(ref);
-          await _runAutoLog();
-        },
-        child: _buildBody(
-          context,
-          ref,
-          listState,
-          moneySummaryAsync,
-          memberIncomeAsync,
-          dueIncomeAsync,
-          dueExpenseAsync,
-          filters,
-          viewMode,
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddMenu(context, ref),
-        icon: const Icon(Icons.add),
-        label: const Text(AppStrings.addExpense),
-      ),
+      body: isGroupsHub
+          ? const _GroupsHubView()
+          : RefreshIndicator(
+              onRefresh: () async {
+                await refreshExpensesData(ref);
+                await _runAutoLog();
+              },
+              child: _buildBody(
+                context,
+                ref,
+                listState,
+                moneySummaryAsync,
+                memberIncomeAsync,
+                dueIncomeAsync,
+                dueExpenseAsync,
+                filters,
+                viewMode,
+              ),
+            ),
+      floatingActionButton: isGroupsHub
+          ? FloatingActionButton.extended(
+              onPressed: () => context.push('/expenses/groups/add'),
+              icon: const Icon(Icons.add),
+              label: const Text(AppStrings.newGroup),
+            )
+          : FloatingActionButton.extended(
+              onPressed: () => _showAddMenu(context, ref),
+              icon: const Icon(Icons.add),
+              label: const Text(AppStrings.addExpense),
+            ),
     );
   }
 
@@ -219,11 +220,16 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       ),
     );
     if (!context.mounted || choice == null) return;
+    final view = ref.read(expenseViewProvider);
+    final scope = view.scope ?? MoneyScope.household;
     final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => choice == 'income'
-            ? const AddIncomeScreen()
-            : const AddExpenseScreen(),
+            ? AddIncomeScreen(initialScope: scope)
+            : AddExpenseScreen(
+                initialScope: scope,
+                initialGroupId: view.groupFilterId,
+              ),
       ),
     );
     if (updated == true) await refreshExpensesData(ref);
@@ -233,7 +239,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     var count = 0;
     if (filters.typeFilter != MoneyListFilter.all) count++;
     if (filters.familyMemberId != null) count++;
-    if (filters.groupId != null) count++;
     return count;
   }
 
@@ -470,31 +475,30 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         Row(
           children: [
             Expanded(
-              child: OutlinedButton(
-                onPressed: () => _showPeriodSheet(context, ref),
-                child: Row(
+              child: ActionChip(
+                avatar: const Icon(Icons.calendar_today_outlined, size: 18),
+                label: Row(
                   children: [
-                    const Icon(Icons.calendar_today_outlined, size: 18),
-                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         periodLabel,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Icon(Icons.arrow_drop_down),
+                    const Icon(Icons.arrow_drop_down, size: 20),
                   ],
                 ),
+                onPressed: () => _showPeriodSheet(context, ref),
               ),
             ),
             const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () => _showFilterSheet(context, ref),
-              icon: const Icon(Icons.tune, size: 18),
-              label: Text(
-                activeFilterCount > 0
-                    ? '${AppStrings.filterList} ($activeFilterCount)'
-                    : AppStrings.filterList,
+            Badge.count(
+              count: activeFilterCount,
+              isLabelVisible: activeFilterCount > 0,
+              child: IconButton.filledTonal(
+                onPressed: () => _showFilterSheet(context, ref),
+                icon: const Icon(Icons.tune),
+                tooltip: AppStrings.filterList,
               ),
             ),
           ],
@@ -630,7 +634,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                   ref
                       .read(moneyListFilterProvider.notifier)
                       .setTypeFilter(MoneyListFilter.all);
-                  ref.read(moneyListFilterProvider.notifier).setGroupId(null);
                   ref.read(expensesListProvider.notifier).refresh();
                 },
                 icon: const Icon(Icons.close, size: 16),
@@ -698,6 +701,272 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   }
 }
 
+/// Compact app-bar dropdown that drives the top-level Expenses view
+/// (All / Personal / Household / Groups). Replaces the full-width tab bar so
+/// the controls no longer consume a body row, and stays reachable from the
+/// Groups hub too.
+class _ViewMenuButton extends ConsumerWidget {
+  const _ViewMenuButton();
+
+  static String _label(ExpenseViewKind kind) {
+    return switch (kind) {
+      ExpenseViewKind.all => AppStrings.viewMoneyAll,
+      ExpenseViewKind.personal => AppStrings.viewMoneyPersonal,
+      ExpenseViewKind.household => AppStrings.viewMoneyHousehold,
+      ExpenseViewKind.groups => AppStrings.viewMoneyGroups,
+      ExpenseViewKind.group => AppStrings.viewMoneyGroups,
+    };
+  }
+
+  static String _hint(ExpenseViewKind kind) {
+    return switch (kind) {
+      ExpenseViewKind.all => AppStrings.viewMoneyAllHint,
+      ExpenseViewKind.personal => AppStrings.viewMoneyPersonalHint,
+      ExpenseViewKind.household => AppStrings.viewMoneyHouseholdHint,
+      ExpenseViewKind.groups => AppStrings.viewMoneyGroupsHint,
+      ExpenseViewKind.group => AppStrings.viewMoneyGroupsHint,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final view = ref.watch(expenseViewProvider);
+    final selected = view.isGroupsTab ? ExpenseViewKind.groups : view.kind;
+    final theme = Theme.of(context);
+
+    void select(ExpenseViewKind kind) {
+      final next = switch (kind) {
+        ExpenseViewKind.all => const ExpenseView.all(),
+        ExpenseViewKind.personal => const ExpenseView.personal(),
+        ExpenseViewKind.household => const ExpenseView.household(),
+        ExpenseViewKind.groups => const ExpenseView.groups(),
+        ExpenseViewKind.group => const ExpenseView.groups(),
+      };
+      ref.read(expenseViewProvider.notifier).setView(next);
+      ref.read(expensesListProvider.notifier).refresh();
+    }
+
+    return PopupMenuButton<ExpenseViewKind>(
+      tooltip: AppStrings.expensesTitle,
+      onSelected: select,
+      itemBuilder: (context) => [
+        for (final kind in const [
+          ExpenseViewKind.all,
+          ExpenseViewKind.personal,
+          ExpenseViewKind.household,
+          ExpenseViewKind.groups,
+        ])
+          CheckedPopupMenuItem<ExpenseViewKind>(
+            value: kind,
+            checked: kind == selected,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text(_label(kind)),
+              subtitle: Text(_hint(kind)),
+            ),
+          ),
+      ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  _label(selected),
+                  overflow: TextOverflow.ellipsis,
+                  style: (theme.appBarTheme.titleTextStyle ??
+                          theme.textTheme.titleLarge)
+                      ?.copyWith(height: 1.1),
+                ),
+              ),
+              const Icon(Icons.arrow_drop_down),
+            ],
+          ),
+          Text(
+            _hint(selected),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The "Groups" tab: a hub of group cards (name, members, your balance) with a
+/// shortcut to full group management. Tapping a card opens the group detail
+/// (expenses + balances + settle).
+class _GroupsHubView extends ConsumerWidget {
+  const _GroupsHubView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final groupsAsync = ref.watch(expenseGroupsProvider);
+    final theme = Theme.of(context);
+
+    return groupsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => ErrorView(
+        error: error,
+        message: ApiErrorFormatter.format(error),
+        onRetry: () => ref.invalidate(expenseGroupsProvider),
+      ),
+      data: (groups) {
+        if (groups.isEmpty) {
+          return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            children: [
+              EmptyState(
+                icon: Icons.groups_outlined,
+                title: AppStrings.emptyExpenseGroups,
+                subtitle: AppStrings.emptyExpenseGroupsHint,
+                actionLabel: AppStrings.newGroup,
+                onAction: () => context.push('/expenses/groups/add'),
+              ),
+            ],
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(expenseGroupsProvider),
+          child: ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            itemCount: groups.length + 1,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    AppStrings.groupsHubHint,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                );
+              }
+              final group = groups[index - 1];
+              return _GroupCard(group: group);
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GroupCard extends ConsumerWidget {
+  const _GroupCard({required this.group});
+
+  final ExpenseGroup group;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final balanceAsync = group.isShared
+        ? ref.watch(expenseGroupMyBalanceProvider(group.id))
+        : const AsyncValue<double?>.data(null);
+
+    Widget balanceLine() {
+      final balance = balanceAsync.valueOrNull;
+      if (balance == null) {
+        return Text(
+          group.isShared
+              ? AppStrings.groupTypeShared
+              : AppStrings.groupTypeOrganizational,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        );
+      }
+      final settled = balance.abs() < 0.01;
+      final owed = balance > 0;
+      final color = settled
+          ? theme.colorScheme.onSurfaceVariant
+          : (owed ? theme.colorScheme.tertiary : theme.colorScheme.error);
+      final label = settled
+          ? AppStrings.balanceSettledUp
+          : (owed ? AppStrings.balanceYouAreOwed : AppStrings.balanceYouOwe);
+      return Row(
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(color: color),
+          ),
+          if (!settled) ...[
+            const SizedBox(width: 4),
+            ValueText(
+              Formatters.currency(balance.abs()),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => context.push('/expenses/groups/${group.id}'),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                child: Icon(
+                  group.isShared ? Icons.people_outline : Icons.folder_outlined,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      group.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      AppStrings.membersCount(group.memberCount ?? 0),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    balanceLine(),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ExpenseFilterSheet extends ConsumerWidget {
   const _ExpenseFilterSheet();
 
@@ -706,7 +975,6 @@ class _ExpenseFilterSheet extends ConsumerWidget {
     final theme = Theme.of(context);
     final filters = ref.watch(moneyListFilterProvider);
     final rosterAsync = ref.watch(familyRosterProvider);
-    final groupsAsync = ref.watch(expenseGroupsProvider);
 
     void refresh() => ref.read(expensesListProvider.notifier).refresh();
 
@@ -720,14 +988,8 @@ class _ExpenseFilterSheet extends ConsumerWidget {
       refresh();
     }
 
-    void setGroup(String? id) {
-      ref.read(moneyListFilterProvider.notifier).setGroupId(id);
-      refresh();
-    }
-
     final hasActive = filters.typeFilter != MoneyListFilter.all ||
-        filters.familyMemberId != null ||
-        filters.groupId != null;
+        filters.familyMemberId != null;
 
     return SafeArea(
       child: Padding(
@@ -752,9 +1014,6 @@ class _ExpenseFilterSheet extends ConsumerWidget {
                           ref
                               .read(moneyListFilterProvider.notifier)
                               .setTypeFilter(MoneyListFilter.all);
-                          ref
-                              .read(moneyListFilterProvider.notifier)
-                              .setGroupId(null);
                           refresh();
                         }
                       : null,
@@ -818,37 +1077,6 @@ class _ExpenseFilterSheet extends ConsumerWidget {
                   );
                 },
               ),
-            groupsAsync.when(
-              loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
-              data: (groups) {
-                if (groups.isEmpty) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: DropdownButtonFormField<String?>(
-                    value: filters.groupId,
-                    decoration: const InputDecoration(
-                      labelText: AppStrings.expenseGroup,
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text(AppStrings.filterAllMoney),
-                      ),
-                      ...groups.map(
-                        (g) => DropdownMenuItem<String?>(
-                          value: g.id,
-                          child: Text(g.name),
-                        ),
-                      ),
-                    ],
-                    onChanged: setGroup,
-                  ),
-                );
-              },
-            ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,

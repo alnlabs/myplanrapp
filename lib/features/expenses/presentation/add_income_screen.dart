@@ -16,6 +16,7 @@ import '../../household/data/family_repository.dart';
 import '../data/expense_repository.dart';
 import '../data/recurring_money_rule_repository.dart';
 import '../utils/income_form_validators.dart';
+import 'scope_selector.dart';
 
 class AddIncomeScreen extends ConsumerStatefulWidget {
   const AddIncomeScreen({
@@ -25,6 +26,7 @@ class AddIncomeScreen extends ConsumerStatefulWidget {
     this.initialIncomeSource,
     this.initialAmount,
     this.initialCategoryId,
+    this.initialScope,
     this.recurringRuleId,
   });
 
@@ -33,6 +35,7 @@ class AddIncomeScreen extends ConsumerStatefulWidget {
   final String? initialIncomeSource;
   final double? initialAmount;
   final String? initialCategoryId;
+  final MoneyScope? initialScope;
   final String? recurringRuleId;
 
   bool get isEditing => income != null;
@@ -49,6 +52,7 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
   DateTime _date = DateTime.now();
   String? _categoryId;
   String? _familyMemberId;
+  MoneyScope _scope = MoneyScope.household;
   bool _loading = false;
   String? _error;
 
@@ -77,6 +81,7 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
       _date = income.expenseDate;
       _categoryId = income.categoryId;
       _familyMemberId = income.familyMemberId;
+      _scope = income.scope;
     } else {
       if (widget.initialIncomeSource != null) {
         _incomeSource.text = widget.initialIncomeSource!;
@@ -86,6 +91,7 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
       }
       _familyMemberId = widget.initialFamilyMemberId;
       _categoryId = widget.initialCategoryId;
+      _scope = widget.initialScope ?? MoneyScope.household;
     }
     _dayOfMonth = _date.day;
   }
@@ -146,6 +152,7 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
           incomeSource: _incomeSource.text.trim(),
           incomeDate: _date,
           note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+          scope: _scope,
         );
       } else {
         await repo.createIncome(
@@ -157,6 +164,7 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
           incomeDate: _date,
           note: _note.text.trim().isEmpty ? null : _note.text.trim(),
           recurringRuleId: widget.recurringRuleId,
+          scope: _scope,
         );
         if (widget.recurringRuleId != null) {
           await ref
@@ -176,6 +184,7 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
                 nextDueDate: _nextRecurringDueDate(),
                 dayOfMonth: _frequency == 'monthly' ? _dayOfMonth : null,
                 note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+                scope: _scope,
               );
           ref.invalidate(memberRecurringIncomeProvider(_familyMemberId!));
           ref.invalidate(dueRecurringIncomeProvider);
@@ -274,6 +283,11 @@ class _AddIncomeScreenState extends ConsumerState<AddIncomeScreen> {
             controller: _note,
             label: AppStrings.note,
             maxLines: 2,
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          ScopeSelector(
+            scope: _scope,
+            onChanged: (value) => setState(() => _scope = value),
           ),
           if (_canOfferRecurring) ...[
             const SizedBox(height: kFormFieldSpacing),

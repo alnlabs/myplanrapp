@@ -23,6 +23,7 @@ void main() {
         child: const AddExpenseScreen(),
       );
 
+      await tester.ensureVisible(find.text(AppStrings.linkToPantry));
       await tester.tap(find.text(AppStrings.linkToPantry));
       await tester.pumpAndSettle();
 

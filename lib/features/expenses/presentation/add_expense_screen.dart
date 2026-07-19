@@ -20,6 +20,7 @@ import '../data/expense_groups_repository.dart';
 import '../data/expense_repository.dart';
 import '../data/recurring_money_rule_repository.dart';
 import 'expense_group_fields.dart';
+import 'scope_selector.dart';
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
   const AddExpenseScreen({
@@ -30,6 +31,7 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
     this.initialCategoryId,
     this.initialGroupId,
     this.initialPaidByMemberId,
+    this.initialScope,
     this.recurringRuleId,
     this.sourceSubscriptionId,
   });
@@ -40,6 +42,7 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
   final String? initialCategoryId;
   final String? initialGroupId;
   final String? initialPaidByMemberId;
+  final MoneyScope? initialScope;
   final String? recurringRuleId;
   final String? sourceSubscriptionId;
 
@@ -57,6 +60,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   final _note = TextEditingController();
   DateTime _date = DateTime.now();
   String? _categoryId;
+  MoneyScope _scope = MoneyScope.household;
   bool _linkPantry = false;
   PantryItem? _pantryItem;
   bool _creatingNewItem = false;
@@ -78,12 +82,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _note.text = expense.note ?? '';
       _date = expense.expenseDate;
       _categoryId = expense.categoryId;
+      _scope = expense.scope;
     } else {
       if (widget.initialTitle != null) _title.text = widget.initialTitle!;
       if (widget.initialAmount != null) {
         _amount.text = widget.initialAmount.toString();
       }
       _categoryId = widget.initialCategoryId;
+      _scope = widget.initialScope ?? MoneyScope.household;
     }
   }
 
@@ -146,6 +152,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             title: _title.text.trim(),
             expenseDate: _date,
             note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+            scope: _scope,
           );
         }
       } else {
@@ -200,6 +207,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             recurringRuleId: widget.recurringRuleId,
             sourceSubscriptionId: widget.sourceSubscriptionId,
             isRecurringInstance: widget.recurringRuleId != null,
+            scope: _scope,
           );
           if (widget.sourceSubscriptionId != null) {
             await ref.read(subscriptionRepositoryProvider).linkLastPaidExpense(
@@ -313,7 +321,26 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 .map((s) => s.groupMemberId)
                 .toSet(),
             initialSplits: widget.expense?.splits,
+            // Rebuild so the "Link to Pantry" option hides as soon as a group
+            // is selected (pantry restock doesn't apply to group expenses).
+            onChanged: () {
+              if (!mounted) return;
+              setState(() {
+                if (_groupFieldsKey.currentState?.groupId != null) {
+                  _linkPantry = false;
+                }
+              });
+            },
           ),
+          // Visibility (Personal/Household) doesn't apply to group expenses;
+          // those are shared with the group's members instead.
+          if (_groupFieldsKey.currentState?.groupId == null) ...[
+            const SizedBox(height: kFormFieldSpacing),
+            ScopeSelector(
+              scope: _scope,
+              onChanged: (value) => setState(() => _scope = value),
+            ),
+          ],
           const SizedBox(height: kFormFieldSpacing),
           AppTextField(
             controller: _note,

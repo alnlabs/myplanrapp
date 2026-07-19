@@ -11,6 +11,19 @@ enum MoneyEntryType {
   }
 }
 
+/// Visibility of a money row. `household` rows are shared with everyone in the
+/// household; `personal` rows are private to their creator (RLS-enforced).
+enum MoneyScope {
+  personal,
+  household;
+
+  String get dbValue => name;
+
+  static MoneyScope fromDb(String? value) {
+    return value == 'personal' ? MoneyScope.personal : MoneyScope.household;
+  }
+}
+
 class ExpenseCategory {
   const ExpenseCategory({
     required this.id,
@@ -46,6 +59,7 @@ class Expense {
     required this.title,
     required this.expenseDate,
     this.entryType = MoneyEntryType.expense,
+    this.scope = MoneyScope.household,
     this.note,
     this.categoryName,
     this.pantryItemId,
@@ -67,6 +81,7 @@ class Expense {
   final String title;
   final DateTime expenseDate;
   final MoneyEntryType entryType;
+  final MoneyScope scope;
   final String? note;
   final String? categoryName;
   final String? pantryItemId;
@@ -109,6 +124,7 @@ class Expense {
       title: json['title'] as String,
       expenseDate: DateTime.parse(json['expense_date'] as String),
       entryType: MoneyEntryType.fromDb(json['entry_type'] as String?),
+      scope: MoneyScope.fromDb(json['scope'] as String?),
       note: json['note'] as String?,
       categoryName: category?['name'] as String?,
       pantryItemId: json['pantry_item_id'] as String?,

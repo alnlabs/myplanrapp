@@ -23,6 +23,11 @@ void main() {
   group('No-data screen states', () {
     testWidgets('dashboard shows all-clear attention and zero summaries',
         (tester) async {
+      tester.view.physicalSize = const Size(1080, 2600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await pumpShellTestApp(
         tester,
         overrides: emptyDashboardOverrides(),

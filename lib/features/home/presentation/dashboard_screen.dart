@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 
 import '../../../core/strings/app_strings.dart';
 import '../utils/dashboard_greeting.dart';
-import '../../../shared/constants/household_modules.dart';
 import '../../../shared/constants/meal_slots.dart';
 import '../../../shared/constants/plan_constants.dart';
 import '../../../shared/models/home_asset.dart';
@@ -14,15 +13,15 @@ import '../../../shared/models/pantry_item.dart';
 import '../../../shared/models/plan.dart';
 import '../../../shared/models/subscription.dart';
 import '../../../shared/models/user_profile.dart';
+import '../../../core/providers/supabase_providers.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/widgets/value_text.dart';
 import '../../alerts/presentation/alerts_screen.dart';
 import '../../assets/data/asset_repository.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../expenses/data/expense_repository.dart';
-import '../../expenses/presentation/add_expense_screen.dart';
+import '../../household/data/family_repository.dart';
 import '../../household/data/household_repository.dart';
-import '../../household/data/household_settings_repository.dart';
 import '../../household/data/medicine_dose_tracker.dart';
 import '../../household/data/medicine_schedule_repository.dart';
 import '../../household/presentation/household_screen.dart';
@@ -34,7 +33,11 @@ import '../../subscriptions/data/subscription_repository.dart';
 import '../../settings/data/device_permissions.dart';
 import '../../settings/presentation/device_permissions_screen.dart';
 import '../data/setup_checklist_provider.dart';
+import '../data/dashboard_layout_provider.dart';
 import '../utils/dashboard_attention_groups.dart';
+import 'add_sheet.dart';
+import 'app_drawer.dart';
+import 'dashboard_customize_sheet.dart';
 import 'setup_checklist_card.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -44,15 +47,47 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
     final householdAsync = ref.watch(activeHouseholdProvider);
-    final modules = ref.watch(enabledModulesProvider);
+    final layout = ref.watch(dashboardLayoutProvider);
 
-    final showExpenses = modules.contains(HouseholdModules.expenses);
-    final showPlans = modules.contains(HouseholdModules.plans);
-    final showAssets = modules.contains(HouseholdModules.assets);
-    final showPantry = modules.contains(HouseholdModules.pantry);
-    final showSubscriptions = modules.contains(HouseholdModules.subscriptions);
+    Widget cardFor(DashboardWidgetId id) {
+      switch (id) {
+        case DashboardWidgetId.expensesSummary:
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: _DashboardExpensesSummary(),
+          );
+        case DashboardWidgetId.needsAttention:
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _AttentionSection(
+              onAlerts: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const AlertsScreen()),
+              ),
+              onPantry: () => context.go('/pantry'),
+              onAssets: () => context.go('/pantry?segment=assets'),
+              onSubscriptions: () => context.push('/subscriptions'),
+            ),
+          );
+        case DashboardWidgetId.medicineToday:
+          return const _DashboardMedicineToday();
+        case DashboardWidgetId.todayMeals:
+          return const _DashboardTodayMeals();
+        case DashboardWidgetId.openPlans:
+          return const _DashboardOpenPlans();
+      }
+    }
+
+    final cards = <Widget>[
+      for (final id in layout.order)
+        if (layout.isVisible(id)) cardFor(id),
+    ];
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => showAddSheet(context),
+        icon: const Icon(Icons.add),
+        label: const Text(AppStrings.addSheetTitle),
+      ),
       body: RefreshIndicator(
         onRefresh: () => _refresh(ref),
         child: CustomScrollView(
@@ -62,7 +97,7 @@ class DashboardScreen extends ConsumerWidget {
               child: SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   child: _DashboardHeader(
                     greeting: dashboardGreeting(),
                     profileAsync: profileAsync,
@@ -70,65 +105,28 @@ class DashboardScreen extends ConsumerWidget {
                     onProfile: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(builder: (_) => const ProfileScreen()),
                     ),
-                    onFamily: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(builder: (_) => const HouseholdScreen()),
-                    ),
+                    onFamily: () => context.go('/family'),
+                    onCustomize: () => showDashboardCustomizeSheet(context),
                   ),
                 ),
               ),
             ),
             const SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
               sliver: SliverToBoxAdapter(
                 child: _DashboardDeviceBlockersBanner(),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              sliver: SliverToBoxAdapter(
-                child: _QuickActionsGrid(
-                  showPlans: showPlans,
-                  showPantry: showPantry,
-                  showExpenses: showExpenses,
-                  showSubscriptions: showSubscriptions,
-                  onAddPlan: () => context.push('/plans/add'),
-                  onAddMeal: () => context.push('/plans/add?type=meal&slot=lunch'),
-                  onAddItem: () => context.push('/pantry/add'),
-                  onAddExpense: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const AddExpenseScreen()),
-                  ),
-                  onAddSubscription: () => context.push('/subscriptions/add'),
-                  onShop: () => context.go('/shop'),
-                ),
               ),
             ),
             const SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverToBoxAdapter(child: _DashboardSetupChecklist()),
             ),
-            if (showExpenses)
-              const SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverToBoxAdapter(child: _DashboardExpensesSummary()),
-              ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverToBoxAdapter(
-                child: _AttentionSection(
-                  showPantry: showPantry,
-                  showAssets: showAssets,
-                  showSubscriptions: showSubscriptions,
-                  onAlerts: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const AlertsScreen()),
-                  ),
-                  onPantry: () => context.go('/pantry'),
-                  onAssets: () => context.go('/pantry?segment=assets'),
-                  onSubscriptions: () => context.go('/subscriptions'),
-                ),
+            for (final card in cards) SliverToBoxAdapter(child: card),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 88 + MediaQuery.of(context).padding.bottom,
               ),
             ),
-            const SliverToBoxAdapter(child: _DashboardTodayOverview()),
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
           ],
         ),
       ),
@@ -136,37 +134,20 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   Future<void> _refresh(WidgetRef ref) async {
-    final modules = ref.read(enabledModulesProvider);
-
     ref.invalidate(activeHouseholdProvider);
     ref.invalidate(userProfileProvider);
-    if (modules.contains(HouseholdModules.pantry)) {
-      ref.invalidate(lowStockItemsProvider);
-      ref.invalidate(expiringItemsProvider);
-    }
-    if (modules.contains(HouseholdModules.expenses)) {
-      ref.invalidate(expenseSummaryProvider);
-    }
-    if (modules.contains(HouseholdModules.plans)) {
-      ref.invalidate(openPlansOverviewProvider);
-      ref.invalidate(todayMealPlansProvider);
-    }
-    if (modules.contains(HouseholdModules.assets)) {
-      ref.invalidate(warrantyExpiringAssetsProvider);
-    }
-    if (modules.contains(HouseholdModules.subscriptions)) {
-      ref.invalidate(subscriptionsDueSoonProvider);
-    }
-    if (modules.contains(HouseholdModules.memberDetails)) {
-      ref.invalidate(medicineRemindersTodayProvider);
-      ref.invalidate(medicineDosesTakenTodayProvider);
-    }
+    ref.invalidate(lowStockItemsProvider);
+    ref.invalidate(expiringItemsProvider);
+    ref.invalidate(expenseSummaryProvider);
+    ref.invalidate(openPlansOverviewProvider);
+    ref.invalidate(todayMealPlansProvider);
+    ref.invalidate(warrantyExpiringAssetsProvider);
+    ref.invalidate(subscriptionsDueSoonProvider);
+    ref.invalidate(medicineRemindersTodayProvider);
+    ref.invalidate(medicineDosesTakenTodayProvider);
     ref.invalidate(setupChecklistDismissedProvider);
     ref.invalidate(setupChecklistProvider);
-    if (modules.contains(HouseholdModules.reminders) ||
-        modules.contains(HouseholdModules.plans)) {
-      ref.invalidate(deviceReminderBlockersProvider);
-    }
+    ref.invalidate(deviceReminderBlockersProvider);
   }
 
   static IconData _planIcon(String type) => switch (type) {
@@ -193,6 +174,7 @@ class _DashboardHeader extends StatelessWidget {
     required this.householdAsync,
     required this.onProfile,
     required this.onFamily,
+    required this.onCustomize,
   });
 
   final String greeting;
@@ -200,6 +182,7 @@ class _DashboardHeader extends StatelessWidget {
   final AsyncValue<Household?> householdAsync;
   final VoidCallback onProfile;
   final VoidCallback onFamily;
+  final VoidCallback onCustomize;
 
   @override
   Widget build(BuildContext context) {
@@ -227,7 +210,7 @@ class _DashboardHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: Text(
@@ -237,20 +220,20 @@ class _DashboardHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onProfile,
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.person_outline,
-                      color: theme.colorScheme.onPrimary,
-                      size: 22,
-                    ),
-                  ),
-                ),
+              _HeaderIconButton(
+                icon: Icons.tune,
+                tooltip: AppStrings.customizeDashboard,
+                onTap: onCustomize,
+              ),
+              _HeaderIconButton(
+                icon: Icons.person_outline,
+                tooltip: AppStrings.profileTitle,
+                onTap: onProfile,
+              ),
+              const _HeaderIconButton(
+                icon: Icons.menu,
+                tooltip: AppStrings.menu,
+                onTap: openAppDrawer,
               ),
             ],
           ),
@@ -306,120 +289,34 @@ class _DashboardHeader extends StatelessWidget {
   }
 }
 
-class _QuickActionsGrid extends StatelessWidget {
-  const _QuickActionsGrid({
-    required this.showPlans,
-    required this.showPantry,
-    required this.showExpenses,
-    required this.showSubscriptions,
-    required this.onAddPlan,
-    required this.onAddMeal,
-    required this.onAddItem,
-    required this.onAddExpense,
-    required this.onAddSubscription,
-    required this.onShop,
-  });
-
-  final bool showPlans;
-  final bool showPantry;
-  final bool showExpenses;
-  final bool showSubscriptions;
-  final VoidCallback onAddPlan;
-  final VoidCallback onAddMeal;
-  final VoidCallback onAddItem;
-  final VoidCallback onAddExpense;
-  final VoidCallback onAddSubscription;
-  final VoidCallback onShop;
-
-  @override
-  Widget build(BuildContext context) {
-    final actions = <({IconData icon, String label, VoidCallback onTap})>[
-      if (showExpenses) (icon: Icons.payments_outlined, label: AppStrings.quickActionExpense, onTap: onAddExpense),
-      if (showPantry) (icon: Icons.shopping_cart_outlined, label: AppStrings.quickActionShop, onTap: onShop),
-    ];
-
-    if (actions.isEmpty) return const SizedBox.shrink();
-
-    final rows = <Widget>[];
-    for (var i = 0; i < actions.length; i += 2) {
-      final left = actions[i];
-      final right = i + 1 < actions.length ? actions[i + 1] : null;
-      rows.add(
-        Padding(
-          padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: _QuickActionTile(
-                  icon: left.icon,
-                  label: left.label,
-                  onTap: left.onTap,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: right == null
-                    ? const SizedBox.shrink()
-                    : _QuickActionTile(
-                        icon: right.icon,
-                        label: right.label,
-                        onTap: right.onTap,
-                      ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionTitle(title: AppStrings.quickActions),
-        const SizedBox(height: 8),
-        ...rows,
-      ],
-    );
-  }
-}
-
-class _QuickActionTile extends StatelessWidget {
-  const _QuickActionTile({
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
     required this.icon,
-    required this.label,
+    required this.tooltip,
     required this.onTap,
   });
 
   final IconData icon;
-  final String label;
+  final String tooltip;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
-      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-      borderRadius: BorderRadius.circular(14),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Icon(icon, color: theme.colorScheme.primary, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+        borderRadius: BorderRadius.circular(20),
+        child: Tooltip(
+          message: tooltip,
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Icon(
+              icon,
+              color: theme.colorScheme.onPrimary,
+              size: 22,
+            ),
           ),
         ),
       ),
@@ -503,18 +400,12 @@ class _SummaryCard extends StatelessWidget {
 
 class _AttentionSection extends ConsumerWidget {
   const _AttentionSection({
-    required this.showPantry,
-    required this.showAssets,
-    required this.showSubscriptions,
     required this.onAlerts,
     required this.onPantry,
     required this.onAssets,
     required this.onSubscriptions,
   });
 
-  final bool showPantry;
-  final bool showAssets;
-  final bool showSubscriptions;
   final VoidCallback onAlerts;
   final VoidCallback onPantry;
   final VoidCallback onAssets;
@@ -528,9 +419,9 @@ class _AttentionSection extends ConsumerWidget {
     required List<Subscription> subs,
   }) {
     final data = buildDashboardAttentionGroups(
-      showPantry: showPantry,
-      showAssets: showAssets,
-      showSubscriptions: showSubscriptions,
+      showPantry: true,
+      showAssets: true,
+      showSubscriptions: true,
       lowStock: lowStock,
       expiring: expiring,
       warranty: warranty,
@@ -578,20 +469,14 @@ class _AttentionSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final lowStock = showPantry
-        ? ref.watch(lowStockItemsProvider).valueOrNull ?? const <PantryItem>[]
-        : const <PantryItem>[];
-    final expiring = showPantry
-        ? ref.watch(expiringItemsProvider).valueOrNull ?? const <PantryItem>[]
-        : const <PantryItem>[];
-    final warranty = showAssets
-        ? ref.watch(warrantyExpiringAssetsProvider).valueOrNull ??
-            const <HomeAsset>[]
-        : const <HomeAsset>[];
-    final subs = showSubscriptions
-        ? ref.watch(subscriptionsDueSoonProvider).valueOrNull ??
-            const <Subscription>[]
-        : const <Subscription>[];
+    final lowStock =
+        ref.watch(lowStockItemsProvider).valueOrNull ?? const <PantryItem>[];
+    final expiring =
+        ref.watch(expiringItemsProvider).valueOrNull ?? const <PantryItem>[];
+    final warranty = ref.watch(warrantyExpiringAssetsProvider).valueOrNull ??
+        const <HomeAsset>[];
+    final subs = ref.watch(subscriptionsDueSoonProvider).valueOrNull ??
+        const <Subscription>[];
 
     final groups = _buildGroups(
       context,
@@ -902,12 +787,14 @@ class _MedicineTodayCard extends ConsumerWidget {
     required this.takenKeys,
     required this.pendingCount,
     required this.takenCount,
+    required this.selfMemberId,
   });
 
   final List<MedicineReminderToday> reminders;
   final Set<String> takenKeys;
   final int pendingCount;
   final int takenCount;
+  final String? selfMemberId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -937,9 +824,13 @@ class _MedicineTodayCard extends ConsumerWidget {
             final doseKey =
                 MedicineDoseTracker.doseKey(item.scheduleId, item.timeIndex);
             final taken = takenKeys.contains(doseKey);
+            final memberTag = selfMemberId != null &&
+                    item.familyMemberId == selfMemberId
+                ? AppStrings.tagMe
+                : item.memberName;
             final subtitleText = [
+              memberTag,
               item.timeLabel,
-              item.memberName,
               if (item.dosage != null) item.dosage!,
             ].join(' · ');
 
@@ -1224,11 +1115,6 @@ class _DashboardDeviceBlockersBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final modules = ref.watch(enabledModulesProvider);
-    final show = modules.contains(HouseholdModules.reminders) ||
-        modules.contains(HouseholdModules.plans);
-    if (!show) return const SizedBox.shrink();
-
     final blockersAsync = ref.watch(deviceReminderBlockersProvider);
     return blockersAsync.when(
       loading: () => const SizedBox.shrink(),
@@ -1310,33 +1196,6 @@ class _DashboardExpensesSummary extends ConsumerWidget {
   }
 }
 
-class _DashboardTodayOverview extends ConsumerWidget {
-  const _DashboardTodayOverview();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final modules = ref.watch(enabledModulesProvider);
-    final showPlans = modules.contains(HouseholdModules.plans);
-    final showMedicine = modules.contains(HouseholdModules.memberDetails);
-    if (!showPlans && !showMedicine) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: _SectionTitle(title: AppStrings.todayOverview),
-        ),
-        if (showMedicine) const _DashboardMedicineToday(),
-        if (showPlans) ...[
-          const _DashboardTodayMeals(),
-          const _DashboardOpenPlans(),
-        ],
-      ],
-    );
-  }
-}
-
 class _DashboardMedicineToday extends ConsumerWidget {
   const _DashboardMedicineToday();
 
@@ -1344,6 +1203,15 @@ class _DashboardMedicineToday extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final medicineTodayAsync = ref.watch(medicineRemindersTodayProvider);
     final medicineTakenAsync = ref.watch(medicineDosesTakenTodayProvider);
+    final currentUserId = ref.watch(currentUserIdProvider);
+    final roster = ref.watch(familyRosterProvider).valueOrNull ?? const [];
+    final selfMemberId = currentUserId == null
+        ? null
+        : roster
+            .where((m) => m.userId == currentUserId)
+            .map((m) => m.id)
+            .cast<String?>()
+            .firstWhere((_) => true, orElse: () => null);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1371,6 +1239,7 @@ class _DashboardMedicineToday extends ConsumerWidget {
               takenKeys: takenKeys,
               pendingCount: pending.length,
               takenCount: takenCount,
+              selfMemberId: selfMemberId,
             ),
           );
         },

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/strings/app_strings.dart';
+import '../../../shared/models/expense.dart';
 import '../../../shared/models/subscription.dart';
 import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/utils/offline_guard.dart';
@@ -15,6 +16,7 @@ import '../../subscriptions/data/subscription_repository.dart';
 import '../data/expense_repository.dart';
 import '../data/recurring_money_rule_repository.dart';
 import '../utils/recurring_due_date.dart';
+import 'scope_selector.dart';
 
 class AddRecurringExpenseScreen extends ConsumerStatefulWidget {
   const AddRecurringExpenseScreen({super.key});
@@ -35,6 +37,7 @@ class _AddRecurringExpenseScreenState
   var _dayOfMonth = DateTime.now().day;
   var _autoLog = false;
   String? _subscriptionId;
+  MoneyScope _scope = MoneyScope.household;
   bool _loading = false;
   String? _error;
 
@@ -75,6 +78,7 @@ class _AddRecurringExpenseScreenState
             note: _note.text.trim().isEmpty ? null : _note.text.trim(),
             autoLog: _autoLog,
             subscriptionId: _subscriptionId,
+            scope: _scope,
           );
 
       ref.invalidate(recurringExpenseRulesProvider);
@@ -202,6 +206,11 @@ class _AddRecurringExpenseScreenState
             title: const Text(AppStrings.autoLogExpense),
             value: _autoLog,
             onChanged: (v) => setState(() => _autoLog = v),
+          ),
+          const SizedBox(height: kFormFieldSpacing),
+          ScopeSelector(
+            scope: _scope,
+            onChanged: (value) => setState(() => _scope = value),
           ),
           const SizedBox(height: kFormFieldSpacing),
           AppTextField(

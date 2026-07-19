@@ -36,10 +36,15 @@ class PaginatedListFooter extends StatelessWidget {
     super.key,
     required this.state,
     this.onRetryLoadMore,
+    this.idleHeight = 96,
   });
 
   final PaginatedListState<dynamic> state;
   final VoidCallback? onRetryLoadMore;
+
+  /// Height of the idle (nothing-to-load) spacer. Defaults to trailing
+  /// breathing room; set to 0 when the footer sits between sections.
+  final double idleHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +65,6 @@ class PaginatedListFooter extends StatelessWidget {
         ),
       );
     }
-    return const SizedBox(height: 96);
+    return SizedBox(height: idleHeight);
   }
 }
