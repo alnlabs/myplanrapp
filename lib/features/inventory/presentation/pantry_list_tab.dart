@@ -6,6 +6,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../shared/constants/pantry_availability.dart';
 import '../../../shared/constants/pantry_constants.dart';
 import '../../../shared/models/pantry_item.dart';
+import '../../../shared/providers/multi_select_provider.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/utils/api_error_formatter.dart';
 import '../../../shared/widgets/empty_state.dart';
@@ -18,9 +19,12 @@ import '../../pantry/data/pantry_items_list_provider.dart';
 import '../../pantry/presentation/pantry_item_detail_screen.dart';
 
 class PantryListTab extends ConsumerWidget {
-  const PantryListTab({super.key, required this.query});
+  const PantryListTab({super.key, required this.query, this.category});
 
   final String query;
+
+  /// When set, only items in this pantry category are shown (null = all).
+  final String? category;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -74,9 +78,10 @@ class PantryListTab extends ConsumerWidget {
                   );
                 }
                 final item = filtered[index];
-                return _PantryListTile(
+                return PantryListTile(
                   item: item,
                   onTap: () => _openItem(context, ref, item),
+                  selectionKey: MultiSelectKeys.pantry,
                 );
               },
             )
@@ -103,6 +108,7 @@ class PantryListTab extends ConsumerWidget {
                 return _PantryGridCard(
                   item: item,
                   onTap: () => _openItem(context, ref, item),
+                  selectionKey: MultiSelectKeys.pantry,
                 );
               },
             ),
@@ -121,17 +127,24 @@ class PantryListTab extends ConsumerWidget {
     );
   }
 
-  List<PantryItem> _filter(List<PantryItem> items) {
-    if (query.isEmpty) return items;
-    return items
-        .where(
-          (i) =>
-              i.name.toLowerCase().contains(query) ||
-              (i.brandLabel?.toLowerCase().contains(query) ?? false) ||
-              (i.category?.toLowerCase().contains(query) ?? false),
-        )
-        .toList();
-  }
+  List<PantryItem> _filter(List<PantryItem> items) =>
+      filterPantryItems(items, query: query, category: category);
+}
+
+/// Shared pantry filter so the list tab and the inventory selection app bar
+/// operate on the same visible set.
+List<PantryItem> filterPantryItems(
+  List<PantryItem> items, {
+  required String query,
+  String? category,
+}) {
+  return items.where((i) {
+    if (category != null && i.category != category) return false;
+    if (query.isEmpty) return true;
+    return i.name.toLowerCase().contains(query) ||
+        (i.brandLabel?.toLowerCase().contains(query) ?? false) ||
+        (i.category?.toLowerCase().contains(query) ?? false);
+  }).toList();
 }
 
 Color _pantryStatusColor(PantryItem item, ThemeData theme) {
@@ -152,14 +165,22 @@ String? _compactStatusLabel(PantryItem item) {
   return item.attentionLabel;
 }
 
-class _PantryListTile extends StatelessWidget {
-  const _PantryListTile({required this.item, required this.onTap});
+class PantryListTile extends ConsumerWidget {
+  const PantryListTile({
+    super.key,
+    required this.item,
+    required this.onTap,
+    this.selectionKey,
+  });
 
   final PantryItem item;
   final VoidCallback onTap;
 
+  /// When set, long-press starts multi-select and taps toggle selection.
+  final String? selectionKey;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final statusColor = _pantryStatusColor(item, theme);
     final statusLabel = _compactStatusLabel(item);
@@ -173,44 +194,58 @@ class _PantryListTile extends StatelessWidget {
       if (statusLabel != null) statusLabel,
     ];
 
+    final key = selectionKey;
+    final selection = key != null ? ref.watch(multiSelectProvider(key)) : null;
+    final notifier = key != null ? ref.read(multiSelectProvider(key).notifier) : null;
+    final selecting = selection?.active ?? false;
+    final selected = selection?.contains(item.id) ?? false;
+
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
+      color: selected ? theme.colorScheme.primaryContainer : null,
       child: InkWell(
-        onTap: onTap,
+        onTap: selecting ? () => notifier!.toggle(item.id) : onTap,
+        onLongPress:
+            (notifier != null && !selecting) ? () => notifier.enter(item.id) : null,
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          leading: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: statusColor.withOpacity(0.14),
-                child: Icon(
-                  PantryCategories.iconFor(item.category),
-                  color: statusColor,
-                  size: 20,
-                ),
-              ),
-              if (_showPantryStatusDot(item))
-                Positioned(
-                  right: -1,
-                  top: -1,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: theme.colorScheme.surface,
-                        width: 2,
+          leading: selecting
+              ? Checkbox(
+                  value: selected,
+                  onChanged: (_) => notifier!.toggle(item.id),
+                )
+              : Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: statusColor.withOpacity(0.14),
+                      child: Icon(
+                        PantryCategories.iconFor(item.category),
+                        color: statusColor,
+                        size: 20,
                       ),
                     ),
-                  ),
+                    if (_showPantryStatusDot(item))
+                      Positioned(
+                        right: -1,
+                        top: -1,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: theme.colorScheme.surface,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-            ],
-          ),
           title: Text(
             item.name,
             maxLines: 2,
@@ -229,28 +264,45 @@ class _PantryListTile extends StatelessWidget {
                   : theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          trailing: const Icon(Icons.chevron_right, size: 20),
+          trailing:
+              selecting ? null : const Icon(Icons.chevron_right, size: 20),
         ),
       ),
     );
   }
 }
 
-class _PantryGridCard extends StatelessWidget {
-  const _PantryGridCard({required this.item, required this.onTap});
+class _PantryGridCard extends ConsumerWidget {
+  const _PantryGridCard({
+    required this.item,
+    required this.onTap,
+    this.selectionKey,
+  });
 
   final PantryItem item;
   final VoidCallback onTap;
+  final String? selectionKey;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final statusColor = _pantryStatusColor(item, theme);
 
+    final key = selectionKey;
+    final selection = key != null ? ref.watch(multiSelectProvider(key)) : null;
+    final notifier = key != null ? ref.read(multiSelectProvider(key).notifier) : null;
+    final selecting = selection?.active ?? false;
+    final selected = selection?.contains(item.id) ?? false;
+
     return CompactGridCard(
-      onTap: onTap,
+      onTap: selecting ? () => notifier!.toggle(item.id) : onTap,
+      onLongPress:
+          (notifier != null && !selecting) ? () => notifier.enter(item.id) : null,
+      selected: selected,
       leading: CompactGridIcon(
-        icon: PantryCategories.iconFor(item.category),
+        icon: selecting
+            ? (selected ? Icons.check_circle : Icons.circle_outlined)
+            : PantryCategories.iconFor(item.category),
         color: statusColor,
         badgeColor: _showPantryStatusDot(item) ? statusColor : null,
       ),

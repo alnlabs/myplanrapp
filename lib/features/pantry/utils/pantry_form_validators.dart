@@ -1,13 +1,9 @@
-import '../../../core/strings/app_strings.dart';
 import '../../../shared/utils/validators.dart';
 
-/// Validates pantry quantity based on whether manual availability is set.
-String? validatePantryQuantity(
-  String? value, {
-  required bool hasAvailabilityStatus,
-}) {
-  if (value == null || value.trim().isEmpty) {
-    return hasAvailabilityStatus ? null : AppStrings.pantryTrackingRequired;
-  }
+/// The exact amount is independent of the color availability label — an item can
+/// track a precise quantity, a color status, or both. So quantity is always
+/// optional and only validated for format when provided.
+String? validatePantryQuantity(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
   return Validators.positiveNumber(value);
 }

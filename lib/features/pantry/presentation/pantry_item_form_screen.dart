@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
+import '../../../shared/constants/pantry_availability.dart';
 import '../../../shared/constants/pantry_constants.dart';
 import '../../../shared/models/pantry_item.dart';
 import '../../../shared/utils/api_error_formatter.dart';
@@ -38,6 +39,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
   late String _lowStockUnit;
   String? _category;
   String? _availabilityStatus;
+  bool _editingAvailability = false;
   DateTime? _expiryDate;
   bool _loading = false;
   String? _error;
@@ -60,7 +62,10 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
     _unit = widget.item?.unit ?? 'kg';
     _lowStockUnit = widget.item?.lowStockUnit ?? _unit;
     _category = widget.item?.category;
-    _availabilityStatus = widget.item?.availabilityStatus;
+    // New items default to "Fine"; editing keeps whatever was saved (which may
+    // be null when the item is tracked purely by amount).
+    _availabilityStatus =
+        isEditing ? widget.item!.availabilityStatus : PantryAvailability.fine;
     _expiryDate = widget.item?.expiryDate;
   }
 
@@ -71,13 +76,6 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
     _quantity.dispose();
     _threshold.dispose();
     super.dispose();
-  }
-
-  String? _validateQuantity(String? value) {
-    return validatePantryQuantity(
-      value,
-      hasAvailabilityStatus: _availabilityStatus != null,
-    );
   }
 
   bool _affectsShop() {
@@ -99,11 +97,6 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
 
     final quantityText = _quantity.text.trim();
     final hasQuantity = quantityText.isNotEmpty;
-    final hasStatus = _availabilityStatus != null;
-    if (!hasQuantity && !hasStatus) {
-      setState(() => _error = AppStrings.pantryTrackingRequired);
-      return;
-    }
 
     setState(() {
       _loading = true;
@@ -172,13 +165,19 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
             textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: kFormFieldSpacing),
-          PantryAvailabilityChips(
-            selected: _availabilityStatus,
-            onSelected: (value) => setState(() {
-              _availabilityStatus = value;
-              _error = null;
-            }),
-          ),
+          if (_editingAvailability)
+            PantryAvailabilityChips(
+              selected: _availabilityStatus,
+              onSelected: (value) => setState(() {
+                _availabilityStatus = value;
+                _error = null;
+              }),
+            )
+          else
+            _AvailabilitySummary(
+              status: _availabilityStatus,
+              onChange: () => setState(() => _editingAvailability = true),
+            ),
           const SizedBox(height: kFormFieldSpacing),
           QuantityWithUnitField(
             controller: _quantity,
@@ -190,7 +189,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
                 _lowStockUnit = v;
               }
             }),
-            validator: _validateQuantity,
+            validator: validatePantryQuantity,
           ),
           const SizedBox(height: kFormFieldSpacing),
           QuantityWithUnitField(
@@ -257,6 +256,59 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Collapsed availability display shown by default so the form isn't cluttered
+/// with every option. Tapping "Change" reveals the full set of chips.
+class _AvailabilitySummary extends StatelessWidget {
+  const _AvailabilitySummary({required this.status, required this.onChange});
+
+  final String? status;
+  final VoidCallback onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final label = PantryAvailability.label(status);
+    final color = status == null
+        ? theme.colorScheme.onSurfaceVariant
+        : PantryAvailability.color(status!);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          AppStrings.availabilitySection,
+          style: theme.textTheme.labelLarge,
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: onChange,
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              tooltip: AppStrings.availabilityChange,
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

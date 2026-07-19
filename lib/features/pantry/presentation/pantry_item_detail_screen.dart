@@ -1,14 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/constants/pantry_availability.dart';
 import '../../../shared/models/pantry_item.dart';
 import '../../../shared/utils/formatters.dart';
-import '../../../shared/widgets/async_screen_body.dart';
 import '../../../shared/widgets/pantry_availability_chips.dart';
-import '../../../shared/widgets/section_header.dart';
 import '../../../shared/widgets/status_chip.dart';
 import '../data/pantry_repository.dart';
 import '../data/pantry_shop_refresh.dart';
@@ -16,16 +15,30 @@ import '../../shopping/data/shopping_repository.dart';
 import 'pantry_item_form_screen.dart';
 import 'pantry_screen.dart';
 
-class PantryItemDetailScreen extends ConsumerWidget {
+class PantryItemDetailScreen extends ConsumerStatefulWidget {
   const PantryItemDetailScreen({super.key, required this.item});
 
   final PantryItem item;
 
-  PantryItem _currentItem(WidgetRef ref) {
+  @override
+  ConsumerState<PantryItemDetailScreen> createState() =>
+      _PantryItemDetailScreenState();
+}
+
+class _PantryItemDetailScreenState
+    extends ConsumerState<PantryItemDetailScreen> {
+  // Optimistic status so the dropdown reflects the choice instantly instead of
+  // waiting for the network round-trip + refetch.
+  String? _statusOverride;
+  bool _hasOverride = false;
+
+  PantryItem get item => widget.item;
+
+  PantryItem _currentItem() {
     return ref.watch(pantryItemProvider(item.id)).valueOrNull ?? item;
   }
 
-  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+  Future<void> _delete(BuildContext context) async {
     final confirmed = await showConfirmDialog(
       context,
       title: AppStrings.delete,
@@ -40,34 +53,56 @@ class PantryItemDetailScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _updateAvailability(
-    BuildContext context,
-    WidgetRef ref,
-    String? status,
-  ) async {
-    await ref.read(pantryRepositoryProvider).updateAvailabilityStatus(
-          item.id,
-          status,
-        );
-    final current = _currentItem(ref);
-    if (status == PantryAvailability.fine) {
-      await ref.read(shoppingRepositoryProvider).removeLowStockShopItemsForPantry(
-            householdId: current.householdId,
-            pantryItemId: current.id,
-            name: current.name,
+  Future<void> _updateAvailability(String? status) async {
+    final current = _currentItem();
+    final previous = current.availabilityStatus;
+
+    // Reflect the choice immediately.
+    setState(() {
+      _statusOverride = status;
+      _hasOverride = true;
+    });
+
+    try {
+      await ref.read(pantryRepositoryProvider).updateAvailabilityStatus(
+            item.id,
+            status,
           );
-    }
-    await refreshPantryAndShop(ref);
-    if (context.mounted) {
-      showSuccessSnackBar(context, AppStrings.availabilityUpdated);
+      if (status == PantryAvailability.fine) {
+        await ref
+            .read(shoppingRepositoryProvider)
+            .removeLowStockShopItemsForPantry(
+              householdId: current.householdId,
+              pantryItemId: current.id,
+              name: current.name,
+            );
+      }
+      if (mounted) {
+        showSuccessSnackBar(context, AppStrings.availabilityUpdated);
+      }
+      // Sync caches in the background; the UI already shows the new value.
+      ref.invalidate(pantryItemProvider(item.id));
+      unawaited(refreshPantryAndShop(ref));
+      await ref.read(pantryItemProvider(item.id).future);
+      if (mounted) setState(() => _hasOverride = false);
+    } catch (e) {
+      // Revert to the real value on failure.
+      if (mounted) {
+        setState(() {
+          _statusOverride = previous;
+          _hasOverride = false;
+        });
+        showSuccessSnackBar(context, AppStrings.errorGeneric);
+      }
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final current = _currentItem(ref);
-    final eventsAsync = ref.watch(stockEventsProvider(current.id));
-    final availabilityChip = StatusChip.forAvailability(current.availabilityStatus);
+  Widget build(BuildContext context) {
+    final current = _currentItem();
+    final displayStatus =
+        _hasOverride ? _statusOverride : current.availabilityStatus;
+    final availabilityChip = StatusChip.forAvailability(displayStatus);
 
     return Scaffold(
       appBar: AppBar(
@@ -83,13 +118,13 @@ class PantryItemDetailScreen extends ConsumerWidget {
               if (updated == true && context.mounted) {
                 ref.invalidate(pantryItemProvider(current.id));
                 await refreshPantryListAndAlerts(ref);
-                Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               }
             },
             icon: const Icon(Icons.edit_outlined),
           ),
           IconButton(
-            onPressed: () => _delete(context, ref),
+            onPressed: () => _delete(context),
             icon: const Icon(Icons.delete_outline),
           ),
         ],
@@ -123,9 +158,8 @@ class PantryItemDetailScreen extends ConsumerWidget {
                   ],
                   const SizedBox(height: 16),
                   PantryAvailabilityChips(
-                    selected: current.availabilityStatus,
-                    onSelected: (status) =>
-                        _updateAvailability(context, ref, status),
+                    selected: displayStatus,
+                    onSelected: _updateAvailability,
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -159,6 +193,9 @@ class PantryItemDetailScreen extends ConsumerWidget {
                     item: current,
                     isRestock: false,
                   ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
                   icon: const Icon(Icons.remove_circle_outline),
                   label: const Text(AppStrings.useItem),
                 ),
@@ -172,35 +209,14 @@ class PantryItemDetailScreen extends ConsumerWidget {
                     item: current,
                     isRestock: true,
                   ),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
                   icon: const Icon(Icons.add_circle_outline),
                   label: const Text(AppStrings.restockItem),
                 ),
               ),
             ],
-          ),
-          const SectionHeader(title: AppStrings.stockHistory),
-          AsyncScreenBody(
-            value: eventsAsync,
-            onRetry: () => ref.invalidate(stockEventsProvider(current.id)),
-            isEmpty: (events) => events.isEmpty,
-            emptyTitle: AppStrings.emptyStockHistory,
-            builder: (events) {
-              return Column(
-                children: events.map((event) {
-                  final sign = event.delta >= 0 ? '+' : '';
-                  return Card(
-                    child: ListTile(
-                      title: Text('$sign${event.delta} ${current.unit}'),
-                      subtitle: Text(event.note ?? event.reason),
-                      trailing: Text(
-                        DateFormat('d MMM, h:mm a').format(event.createdAt.toLocal()),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              );
-            },
           ),
         ],
       ),

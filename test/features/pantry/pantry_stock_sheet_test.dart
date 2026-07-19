@@ -12,7 +12,7 @@ import '../../helpers/test_fixtures.dart';
 
 void main() {
   group('showStockSheet widget', () {
-    testWidgets('opens use-item sheet with quantity validation', (tester) async {
+    testWidgets('opens use-item sheet with stepper control', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
@@ -37,10 +37,14 @@ void main() {
       await tester.tap(find.text('Open use sheet'));
       await tester.pumpAndSettle();
 
+      // No typed field / required validation anymore — an easy tap control with
+      // a slider and a "Use all" shortcut is shown instead.
       expect(find.text(AppStrings.useItem), findsOneWidget);
-      await tester.tap(find.widgetWithText(LoadingButton, AppStrings.save));
-      await tester.pumpAndSettle();
-      expect(find.text(AppStrings.requiredField), findsOneWidget);
+      expect(find.textContaining(AppStrings.available), findsOneWidget);
+      expect(find.textContaining(AppStrings.remaining), findsOneWidget);
+      expect(find.text(AppStrings.useAll), findsOneWidget);
+      expect(find.byType(Slider), findsOneWidget);
+      expect(find.byType(LoadingButton), findsOneWidget);
     });
 
     testWidgets('shows clear-availability toggle on restock', (tester) async {

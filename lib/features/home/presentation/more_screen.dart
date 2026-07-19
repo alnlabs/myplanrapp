@@ -7,6 +7,7 @@ import '../../../shared/constants/nav_features.dart';
 import '../../../shared/utils/shell_navigation.dart';
 import '../../../shared/widgets/secret_tap.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../assistant/presentation/scan_receipt_screen.dart';
 import '../../feedback/presentation/feedback_screen.dart';
 import '../../household/data/household_settings_repository.dart';
 import '../../household/presentation/household_screen.dart';
@@ -46,6 +47,15 @@ class MoreScreen extends ConsumerWidget {
     ];
 
     final appItems = <_MoreTile>[
+      _MoreTile(
+        icon: Icons.receipt_long_outlined,
+        color: theme.colorScheme.primary,
+        title: AppStrings.assistantTitle,
+        subtitle: AppStrings.moreAssistantHint,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const ScanReceiptScreen()),
+        ),
+      ),
       _MoreTile(
         icon: Icons.settings_outlined,
         color: Colors.blueGrey,

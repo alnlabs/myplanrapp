@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/models/shopping_list_item.dart';
+import '../../../shared/providers/multi_select_provider.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/utils/list_sharing.dart';
 import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../../../shared/widgets/async_screen_body.dart';
+import '../../../shared/widgets/restock_amount_sheet.dart';
+import '../../../shared/widgets/selection_app_bar.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../pantry/data/pantry_items_list_provider.dart';
 import '../../pantry/data/pantry_repository.dart';
@@ -26,6 +31,11 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   final _nameController = TextEditingController();
   bool _restockOnBuy = true;
   bool _initialShopSyncDone = false;
+  // Items removed optimistically while the buy completes in the background.
+  final Set<String> _hiddenIds = {};
+
+  void _hide(String id) => setState(() => _hiddenIds.add(id));
+  void _unhide(String id) => setState(() => _hiddenIds.remove(id));
 
   @override
   void dispose() {
@@ -79,6 +89,27 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     await showShareShopListSheet(context, text: text);
   }
 
+  Future<void> _deleteSelected() async {
+    final notifier =
+        ref.read(multiSelectProvider(MultiSelectKeys.shopping).notifier);
+    final ids =
+        ref.read(multiSelectProvider(MultiSelectKeys.shopping)).ids.toList();
+    if (ids.isEmpty) return;
+    final confirmed = await confirmBulkDelete(context, ids.length);
+    if (!confirmed) return;
+    final repo = ref.read(shoppingRepositoryProvider);
+    for (final id in ids) {
+      await repo.deleteItem(id);
+    }
+    notifier.clear();
+    ref.invalidate(shoppingListProvider);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.itemsDeleted(ids.length))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_initialShopSyncDone) {
@@ -88,10 +119,31 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
 
     final itemsAsync = ref.watch(shoppingListProvider);
     final items = itemsAsync.valueOrNull ?? [];
+    final visibleItems =
+        items.where((i) => !_hiddenIds.contains(i.id)).toList();
     final hasItems = items.isNotEmpty;
+    final selection = ref.watch(multiSelectProvider(MultiSelectKeys.shopping));
 
     return Scaffold(
-      appBar: FeatureScreenAppBar.forShellRoute(
+      appBar: selection.active
+          ? SelectionAppBar(
+              selectedCount: selection.count,
+              totalCount: visibleItems.length,
+              onClose: () => ref
+                  .read(multiSelectProvider(MultiSelectKeys.shopping).notifier)
+                  .clear(),
+              onSelectAll: () {
+                final notifier = ref.read(
+                    multiSelectProvider(MultiSelectKeys.shopping).notifier);
+                if (selection.count >= visibleItems.length) {
+                  notifier.selectAll(const []);
+                } else {
+                  notifier.selectAll(visibleItems.map((e) => e.id));
+                }
+              },
+              onDelete: () => _deleteSelected(),
+            )
+          : FeatureScreenAppBar.forShellRoute(
         context,
         title: AppStrings.shopTitle,
         subtitle: AppStrings.shopSubtitle,
@@ -154,8 +206,12 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                 emptyTitle: AppStrings.emptyShop,
                 emptySubtitle: AppStrings.emptyShopHint,
                 builder: (items) => _ShoppingList(
-                  items: items,
+                  items: items
+                      .where((i) => !_hiddenIds.contains(i.id))
+                      .toList(),
                   restockOnBuy: _restockOnBuy,
+                  onHide: _hide,
+                  onUnhide: _unhide,
                 ),
               ),
             ),
@@ -234,10 +290,14 @@ class _ShoppingList extends ConsumerWidget {
   const _ShoppingList({
     required this.items,
     required this.restockOnBuy,
+    required this.onHide,
+    required this.onUnhide,
   });
 
   final List<ShoppingListItem> items;
   final bool restockOnBuy;
+  final void Function(String id) onHide;
+  final void Function(String id) onUnhide;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -256,6 +316,8 @@ class _ShoppingList extends ConsumerWidget {
             (item) => _ShopItemTile(
               item: item,
               restockOnBuy: restockOnBuy,
+              onHide: onHide,
+              onUnhide: onUnhide,
             ),
           ),
       ],
@@ -320,10 +382,17 @@ class _EmptyRow extends StatelessWidget {
 }
 
 class _ShopItemTile extends ConsumerWidget {
-  const _ShopItemTile({required this.item, required this.restockOnBuy});
+  const _ShopItemTile({
+    required this.item,
+    required this.restockOnBuy,
+    required this.onHide,
+    required this.onUnhide,
+  });
 
   final ShoppingListItem item;
   final bool restockOnBuy;
+  final void Function(String id) onHide;
+  final void Function(String id) onUnhide;
 
   ({IconData icon, String label}) get _source {
     return switch (item.source) {
@@ -338,15 +407,61 @@ class _ShopItemTile extends ConsumerWidget {
     ref.invalidate(shoppingListProvider);
   }
 
-  Future<void> _buy(WidgetRef ref) async {
-    await ref.read(shoppingRepositoryProvider).completeItem(
-          item.id,
-          restock: restockOnBuy,
-          pantryItemId: item.pantryItemId,
+  Future<void> _buy(BuildContext context, WidgetRef ref) async {
+    final pantryId = item.pantryItemId;
+
+    // When restock-on-buy is on and the item is linked to a pantry item, ask
+    // how much was actually restocked before updating stock.
+    double? manualRestock;
+    var pantryHandled = false;
+    if (restockOnBuy && pantryId != null) {
+      final pantry = await ref.read(pantryRepositoryProvider).fetchItem(pantryId);
+      if (pantry != null && context.mounted) {
+        final result = await showRestockAmountSheet(
+          context: context,
+          itemName: pantry.name,
+          unit: pantry.unit,
+          suggestedAmount: item.quantity,
         );
-    ref.invalidate(shoppingListProvider);
-    await refreshPantryList(ref);
-    ref.invalidate(lowStockItemsProvider);
+        if (result == null) return; // dismissed — leave item on the list
+        pantryHandled = true;
+        if (result.restock && result.amount > 0) {
+          manualRestock = result.amount;
+        }
+      }
+    }
+
+    // Optimistically remove the row so it feels instant.
+    onHide(item.id);
+
+    try {
+      if (manualRestock != null && pantryId != null) {
+        await ref.read(pantryRepositoryProvider).applyStockEvent(
+              itemId: pantryId,
+              delta: manualRestock,
+              reason: 'restocked',
+              note: AppStrings.restockedFromShop,
+            );
+      }
+      await ref.read(shoppingRepositoryProvider).completeItem(
+            item.id,
+            // Pantry stock already handled above when the modal was used.
+            restock: pantryHandled ? false : restockOnBuy,
+            pantryItemId: pantryId,
+          );
+      if (pantryId != null) ref.invalidate(pantryItemProvider(pantryId));
+      // Sync the rest in the background — the row is already gone.
+      ref.invalidate(shoppingListProvider);
+      ref.invalidate(lowStockItemsProvider);
+      unawaited(refreshPantryList(ref));
+    } catch (_) {
+      onUnhide(item.id); // put it back so the user can retry
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.errorGeneric)),
+        );
+      }
+    }
   }
 
   @override
@@ -356,6 +471,84 @@ class _ShopItemTile extends ConsumerWidget {
     final quantity = (item.quantity != null && item.unit != null)
         ? Formatters.quantity(item.quantity!, item.unit!)
         : null;
+
+    final selection = ref.watch(multiSelectProvider(MultiSelectKeys.shopping));
+    final selectionNotifier =
+        ref.read(multiSelectProvider(MultiSelectKeys.shopping).notifier);
+    final selecting = selection.active;
+    final selected = selection.contains(item.id);
+
+    final card = Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: selected ? theme.colorScheme.primaryContainer : null,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: selecting
+            ? () => selectionNotifier.toggle(item.id)
+            : () => _buy(context, ref),
+        onLongPress:
+            selecting ? null : () => selectionNotifier.enter(item.id),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            children: [
+              Checkbox(
+                value: selecting ? selected : false,
+                onChanged: selecting
+                    ? (_) => selectionNotifier.toggle(item.id)
+                    : (_) => _buy(context, ref),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (quantity != null) ...[
+                          Text(
+                            quantity,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          const SizedBox(width: 8),
+                          Text('·', style: theme.textTheme.bodySmall),
+                          const SizedBox(width: 8),
+                        ],
+                        Icon(source.icon,
+                            size: 13, color: theme.colorScheme.outline),
+                        const SizedBox(width: 4),
+                        Text(
+                          source.label,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.outline,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (!selecting)
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  iconSize: 20,
+                  tooltip: AppStrings.removeItem,
+                  onPressed: () => _delete(ref),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // Swipe-to-delete only makes sense outside selection mode.
+    if (selecting) return card;
 
     return Dismissible(
       key: ValueKey(item.id),
@@ -368,68 +561,11 @@ class _ShopItemTile extends ConsumerWidget {
           color: theme.colorScheme.errorContainer,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(Icons.delete_outline, color: theme.colorScheme.onErrorContainer),
+        child:
+            Icon(Icons.delete_outline, color: theme.colorScheme.onErrorContainer),
       ),
       onDismissed: (_) => _delete(ref),
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => _buy(ref),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              children: [
-                Checkbox(
-                  value: false,
-                  onChanged: (_) => _buy(ref),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.name,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          if (quantity != null) ...[
-                            Text(
-                              quantity,
-                              style: theme.textTheme.bodySmall,
-                            ),
-                            const SizedBox(width: 8),
-                            Text('·', style: theme.textTheme.bodySmall),
-                            const SizedBox(width: 8),
-                          ],
-                          Icon(source.icon, size: 13, color: theme.colorScheme.outline),
-                          const SizedBox(width: 4),
-                          Text(
-                            source.label,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  iconSize: 20,
-                  tooltip: AppStrings.removeItem,
-                  onPressed: () => _delete(ref),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      child: card,
     );
   }
 }

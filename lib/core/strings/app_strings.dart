@@ -104,8 +104,9 @@ abstract final class AppStrings {
   static const pantryViewList = viewList;
   static const inventoryTitle = 'Pantry';
   static const inventorySubtitle = 'Food stock and home assets';
-  static const segmentFood = 'Food';
-  static const segmentAssets = 'Home items';
+  static const segmentAll = 'All';
+  static const segmentFood = 'Kitchen';
+  static const segmentAssets = 'Assets';
   static const addItem = 'Add item';
   static const editItem = 'Edit item';
   static const itemName = 'Item name';
@@ -115,9 +116,19 @@ abstract final class AppStrings {
   static const unit = 'Unit';
   static const lowStockAlert = 'Low stock alert at';
   static const category = 'Category';
+  static const allCategories = 'All';
   static const expiryDate = 'Expiry date';
   static const useItem = 'Use';
   static const restockItem = 'Restock';
+  static const available = 'Available';
+  static const remaining = 'Remaining';
+  static const useAll = 'Use all';
+  static const nothingToUse = 'Nothing left to use';
+  static const stepsOf = 'Adjusts in steps of';
+  static const restockHowMuch = 'How much did you restock?';
+  static const restockAddToPantry = 'Add to pantry';
+  static const restockSkip = 'Just mark bought';
+  static const restockedFromShop = 'Bought';
   static const stockHistory = 'History';
   static const emptyStockHistory = 'No history yet';
   static const emptyPantry = 'No items yet';
@@ -130,9 +141,10 @@ abstract final class AppStrings {
   static const availabilityAuto = 'Track by amount';
   static const availabilityWarning = 'Running low';
   static const availabilityRequired = 'Need soon';
-  static const availabilityEmergency = 'Almost out';
+  static const availabilityEmergency = 'Empty';
   static const availabilityHint =
       'Update when an item is running low — no need to count every time.';
+  static const availabilityChange = 'Change';
   static const lowStockAlertOptionalHint =
       'Optional — only if you track exact amounts';
   static const pantryTrackingRequired =
@@ -725,7 +737,16 @@ abstract final class AppStrings {
   // Common
   static const save = 'Save';
   static const cancel = 'Cancel';
+  static const close = 'Close';
   static const add = 'Add';
+  static const selectAll = 'Select all';
+  static const deselectAll = 'Deselect all';
+  static String selectedCount(int n) => '$n selected';
+  static const deleteSelectedTitle = 'Delete selected?';
+  static String deleteSelectedMessage(int n) =>
+      n == 1 ? 'Delete this item? This cannot be undone.'
+             : 'Delete these $n items? This cannot be undone.';
+  static String itemsDeleted(int n) => n == 1 ? '1 deleted' : '$n deleted';
   static const edit = 'Edit';
   static const delete = 'Delete';
   static const retry = 'Try again';
@@ -849,4 +870,91 @@ abstract final class AppStrings {
   static const resetPasswordCta = 'Update password';
   static const restockOnBuy = 'Restock pantry when bought';
   static const itemDeleted = 'Item deleted';
+
+  // Receipt scanning assistant
+  static const assistantTitle = 'Scan receipt';
+  static const moreAssistantHint = 'Snap a receipt to add expenses and pantry';
+  static const scanReceiptInstruction =
+      'Take a photo or choose a receipt image. We will read it and suggest what to add.';
+  static const scanReceiptTakePhoto = 'Take photo';
+  static const scanReceiptFromGallery = 'Choose from gallery';
+  static const scanReceiptAnalyzing = 'Reading your receipt…';
+  static const receiptDuplicateTitle = 'Receipt already added';
+  static const receiptDuplicateBody =
+      'This receipt looks like one you already processed. Add it again anyway?';
+  static const receiptProcessAnyway = 'Add anyway';
+  static const receiptPreviewTitle = 'Review & apply';
+  static const receiptExpenseSection = 'Expense';
+  static const receiptItemsSection = 'Items';
+  static const receiptNoItems = 'No items detected';
+  static const receiptMerchant = 'Merchant';
+  static const receiptAmount = 'Amount';
+  static const receiptDate = 'Date';
+  static const receiptStatusNew = 'New';
+  static const receiptStatusRestock = 'Restock';
+  static const receiptDestPantry = 'Pantry';
+  static const receiptDestShopping = 'Shopping';
+  static const receiptDestIgnore = 'Ignore';
+  static const receiptApplyAll = 'Apply all';
+  static const receiptActionCreate = 'Create';
+  static const receiptActionRestock = 'Restock';
+  static const receiptActionAddShop = 'Add to shop';
+  static const receiptApplied = 'Applied';
+  static const receiptExpenseCreate = 'Add expense';
+  static const receiptExpenseAdded = 'Expense added';
+  static const receiptApplyDone = 'Added from receipt';
+  static const receiptApplyFailed = 'Could not apply. Please try again.';
+
+  // Manual "bring your own AI" path: no server-side model call. The user runs
+  // the prompt below in any AI app, then pastes the JSON result back in.
+  static const receiptPasteTile = 'Paste from your own AI';
+  static const receiptPasteHint =
+      'Use ChatGPT, Gemini or any app — no scan limit';
+  static const receiptPasteTitle = 'Paste receipt data';
+  static const receiptPasteStep1 = '1. Copy this prompt';
+  static const receiptPasteStep2 =
+      '2. Paste it into any AI app with your receipt (text or photo)';
+  static const receiptPasteStep3 = '3. Paste the AI\u2019s JSON reply below';
+  static const receiptPasteCopyPrompt = 'Copy prompt';
+  static const receiptPastePromptCopied = 'Prompt copied';
+  static const receiptPasteInputLabel = 'AI reply (JSON)';
+  static const receiptPasteInputHint = 'Paste the JSON here';
+  static const receiptPasteReview = 'Review & apply';
+  static const receiptPasteEmpty = 'Paste the AI reply first.';
+  static const receiptPasteNoHousehold =
+      'Join or create a household before adding a receipt.';
+
+  // Saved / scanned receipts history.
+  static const receiptsTitle = 'Scanned receipts';
+  static const receiptsEmpty = 'No receipts yet. Scan or paste one to get started.';
+  static const receiptsProcessed = 'Applied';
+  static const receiptsPending = 'Draft';
+  static const receiptsItemsCount = 'items';
+  static const receiptsNoLines = 'No line items saved.';
+  static const receiptsUnknownMerchant = 'Receipt';
+
+  static const receiptPastePrompt =
+      'You are a receipt parser. Read the receipt below (or the attached photo) '
+      'and reply with ONLY a JSON object, no markdown, no explanation, in exactly '
+      'this shape:\n'
+      '{\n'
+      '  "merchant": "store name or null",\n'
+      '  "purchased_at": "YYYY-MM-DD or null",\n'
+      '  "total": number or null,\n'
+      '  "currency": "INR",\n'
+      '  "items": [\n'
+      '    {\n'
+      '      "name": "short item name",\n'
+      '      "qty": number or null,\n'
+      '      "unit": "pcs | kg | g | l | ml | pack or null",\n'
+      '      "unit_price": number or null,\n'
+      '      "line_total": number or null,\n'
+      '      "destination": "pantry | shopping | ignore"\n'
+      '    }\n'
+      '  ]\n'
+      '}\n'
+      'Rules: use "pantry" for groceries/consumables you keep at home, '
+      '"shopping" for things still to buy, and "ignore" for taxes, discounts or '
+      'totals. Numbers must be plain (no currency symbols). Reply with JSON only.\n\n'
+      'Receipt:\n';
 }

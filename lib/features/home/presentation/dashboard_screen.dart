@@ -77,9 +77,9 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              sliver: const SliverToBoxAdapter(
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              sliver: SliverToBoxAdapter(
                 child: _DashboardDeviceBlockersBanner(),
               ),
             ),
@@ -334,12 +334,8 @@ class _QuickActionsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = <({IconData icon, String label, VoidCallback onTap})>[
-      if (showPlans) (icon: Icons.event_note_outlined, label: AppStrings.quickActionPlan, onTap: onAddPlan),
-      if (showPlans) (icon: Icons.restaurant_outlined, label: AppStrings.quickActionMeal, onTap: onAddMeal),
-      if (showPantry) (icon: Icons.kitchen_outlined, label: AppStrings.quickActionPantry, onTap: onAddItem),
-      if (showPantry) (icon: Icons.shopping_cart_outlined, label: AppStrings.quickActionShop, onTap: onShop),
       if (showExpenses) (icon: Icons.payments_outlined, label: AppStrings.quickActionExpense, onTap: onAddExpense),
-      if (showSubscriptions) (icon: Icons.subscriptions_outlined, label: AppStrings.quickActionSubscription, onTap: onAddSubscription),
+      if (showPantry) (icon: Icons.shopping_cart_outlined, label: AppStrings.quickActionShop, onTap: onShop),
     ];
 
     if (actions.isEmpty) return const SizedBox.shrink();

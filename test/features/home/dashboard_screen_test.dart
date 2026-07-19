@@ -6,7 +6,6 @@ import 'package:myplanr/core/strings/app_strings.dart';
 import 'package:myplanr/features/home/presentation/dashboard_screen.dart';
 
 import '../../helpers/dashboard_overrides.dart';
-import '../../helpers/pump_app.dart';
 
 void main() {
   group('DashboardScreen behavior', () {
@@ -60,15 +59,6 @@ void main() {
         ),
         findsOneWidget,
       );
-    });
-
-    testWidgets('quick action plan navigates to add plan route', (tester) async {
-      await pumpDashboardWithRoutes(tester);
-
-      await tester.tap(find.text(AppStrings.quickActionPlan));
-      await tester.pumpAndSettle();
-
-      expect(find.text('plans-add-route'), findsOneWidget);
     });
 
     testWidgets('quick action expense opens add expense screen', (tester) async {

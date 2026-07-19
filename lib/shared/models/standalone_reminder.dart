@@ -1,4 +1,4 @@
-import '../constants/reminder_repeat.dart';
+import 'reminder_repeat_spec.dart';
 
 class StandaloneReminder {
   const StandaloneReminder({
@@ -9,7 +9,7 @@ class StandaloneReminder {
     this.notes,
     required this.reminderAt,
     required this.isActive,
-    this.repeat = ReminderRepeat.none,
+    this.repeatSpec = ReminderRepeatSpec.none,
   });
 
   final String id;
@@ -20,10 +20,13 @@ class StandaloneReminder {
   final DateTime reminderAt;
   final bool isActive;
 
-  /// Repeat frequency: one of [ReminderRepeat] values. `none` = one-time.
-  final String repeat;
+  /// Full repeat pattern. `frequency == none` means a one-time reminder.
+  final ReminderRepeatSpec repeatSpec;
 
-  bool get isRecurring => ReminderRepeat.isRecurring(repeat);
+  /// Coarse frequency string (kept for the legacy `repeat` column).
+  String get repeat => repeatSpec.frequency;
+
+  bool get isRecurring => repeatSpec.isRecurring;
 
   factory StandaloneReminder.fromJson(Map<String, dynamic> json) {
     return StandaloneReminder(
@@ -34,7 +37,10 @@ class StandaloneReminder {
       notes: json['notes'] as String?,
       reminderAt: DateTime.parse(json['reminder_at'] as String),
       isActive: json['is_active'] as bool? ?? true,
-      repeat: ReminderRepeat.normalize(json['repeat'] as String?),
+      repeatSpec: ReminderRepeatSpec.fromConfig(
+        json['repeat_config'] as Map<String, dynamic>?,
+        legacyRepeat: json['repeat'] as String?,
+      ),
     );
   }
 
@@ -46,7 +52,8 @@ class StandaloneReminder {
       'notes': notes,
       'reminder_at': reminderAt.toUtc().toIso8601String(),
       'is_active': isActive,
-      'repeat': repeat,
+      'repeat': repeatSpec.legacyFrequency,
+      'repeat_config': repeatSpec.toConfigJson(),
     };
   }
 
@@ -56,7 +63,8 @@ class StandaloneReminder {
       'notes': notes,
       'reminder_at': reminderAt.toUtc().toIso8601String(),
       'is_active': isActive,
-      'repeat': repeat,
+      'repeat': repeatSpec.legacyFrequency,
+      'repeat_config': repeatSpec.toConfigJson(),
     };
   }
 
@@ -65,7 +73,7 @@ class StandaloneReminder {
     String? notes,
     DateTime? reminderAt,
     bool? isActive,
-    String? repeat,
+    ReminderRepeatSpec? repeatSpec,
   }) {
     return StandaloneReminder(
       id: id,
@@ -75,7 +83,7 @@ class StandaloneReminder {
       notes: notes ?? this.notes,
       reminderAt: reminderAt ?? this.reminderAt,
       isActive: isActive ?? this.isActive,
-      repeat: repeat ?? this.repeat,
+      repeatSpec: repeatSpec ?? this.repeatSpec,
     );
   }
 }

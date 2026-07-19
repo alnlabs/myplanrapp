@@ -8,14 +8,12 @@ import '../../helpers/test_fixtures.dart';
 
 void main() {
   group('PantryItemDetailScreen widget', () {
-    testWidgets('renders item details, actions, and stock history', (tester) async {
+    testWidgets('renders item details and stock actions', (tester) async {
       await pumpTestApp(
         tester,
         overrides: [
           pantryItemProvider(testPantryItem.id)
               .overrideWith((ref) async => testPantryItem),
-          stockEventsProvider(testPantryItem.id)
-              .overrideWith((ref) async => [testStockEvent]),
         ],
         child: PantryItemDetailScreen(item: testPantryItem),
       );
@@ -24,23 +22,19 @@ void main() {
       expect(find.textContaining('2'), findsWidgets);
       expect(find.text(AppStrings.useItem), findsOneWidget);
       expect(find.text(AppStrings.restockItem), findsOneWidget);
-      expect(find.text(AppStrings.stockHistory), findsOneWidget);
-      expect(find.textContaining('Weekly shop'), findsOneWidget);
     });
 
-    testWidgets('shows empty stock history message', (tester) async {
+    testWidgets('no longer shows a stock history section', (tester) async {
       await pumpTestApp(
         tester,
         overrides: [
           pantryItemProvider(testPantryItem.id)
               .overrideWith((ref) async => testPantryItem),
-          stockEventsProvider(testPantryItem.id)
-              .overrideWith((ref) async => []),
         ],
         child: PantryItemDetailScreen(item: testPantryItem),
       );
 
-      expect(find.text(AppStrings.emptyStockHistory), findsOneWidget);
+      expect(find.text(AppStrings.stockHistory), findsNothing);
     });
   });
 }

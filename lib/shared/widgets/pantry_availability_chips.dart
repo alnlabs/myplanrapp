@@ -38,27 +38,42 @@ class PantryAvailabilityChips extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: options.map((option) {
-            final isSelected = selected == option.value;
+        // A compact single-choice dropdown; each level carries its own color so
+        // the meaning is clear both in the list and once selected.
+        DropdownButtonFormField<String>(
+          value: selected,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          items: options.map((option) {
             final color = PantryAvailability.color(option.value);
-
-            return ChoiceChip(
-              label: Text(option.label),
-              selected: isSelected,
-              selectedColor: color.withOpacity(0.16),
-              side: BorderSide(
-                color: isSelected ? color : theme.colorScheme.outlineVariant,
+            return DropdownMenuItem<String>(
+              value: option.value,
+              child: Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    option.label,
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-              labelStyle: theme.textTheme.labelLarge?.copyWith(
-                color: isSelected ? color : theme.colorScheme.onSurface,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              ),
-              onSelected: (_) => onSelected(option.value),
             );
           }).toList(),
+          onChanged: onSelected,
         ),
       ],
     );

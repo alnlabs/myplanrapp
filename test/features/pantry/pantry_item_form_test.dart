@@ -19,17 +19,20 @@ void main() {
       expect(find.text(AppStrings.requiredField), findsOneWidget);
     });
 
-    testWidgets('requires quantity when availability is not set', (tester) async {
+    testWidgets('defaults availability to Fine so quantity is optional',
+        (tester) async {
       await pumpTestApp(
         tester,
         child: const PantryItemFormScreen(),
       );
 
+      // New items default to "Fine" availability, so tracking is satisfied
+      // without entering a quantity.
       await tester.enterText(find.byType(TextFormField).first, 'Milk');
       await tester.pumpAndSettle();
       await tapSave(tester);
 
-      expect(find.text(AppStrings.pantryTrackingRequired), findsOneWidget);
+      expect(find.text(AppStrings.pantryTrackingRequired), findsNothing);
     });
 
     testWidgets('allows empty quantity when availability chip is selected',

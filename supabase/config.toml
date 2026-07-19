@@ -394,6 +394,13 @@ authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
 
+# Receipt-analysis assistant function. Requires the caller's JWT so the function
+# reads/writes as the user (RLS enforced). Set its model key as a deployed
+# secret, NOT in the app .env: `supabase secrets set GEMINI_API_KEY=...`
+[functions.assistant]
+enabled = true
+verify_jwt = true
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

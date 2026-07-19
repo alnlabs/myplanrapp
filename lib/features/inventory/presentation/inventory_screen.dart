@@ -3,18 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/strings/app_strings.dart';
+import '../../../shared/constants/asset_constants.dart';
+import '../../../shared/constants/pantry_constants.dart';
 import '../../../shared/providers/list_display_mode_provider.dart';
+import '../../../shared/providers/multi_select_provider.dart';
 import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../../../shared/widgets/filter_menu_button.dart';
 import '../../../shared/widgets/list_display_mode_toggle.dart';
+import '../../../shared/widgets/selection_app_bar.dart';
 import '../../assets/data/asset_repository.dart';
 import '../../assets/presentation/asset_form_screen.dart';
 import '../../assets/presentation/assets_list_tab.dart';
 import '../../pantry/data/pantry_items_list_provider.dart';
 import '../../pantry/data/pantry_repository.dart';
+import 'inventory_all_tab.dart';
 import 'pantry_list_tab.dart';
 
-enum InventorySegment { food, assets }
+enum InventorySegment { all, food, assets }
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({
@@ -31,6 +36,9 @@ class InventoryScreen extends ConsumerStatefulWidget {
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   late InventorySegment _segment;
   String _query = '';
+  String? _pantryCategory; // null = all categories
+  bool _searching = false;
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -38,88 +46,258 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     _segment = widget.initialSegment;
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _openSearch() => setState(() => _searching = true);
+
+  void _closeSearch() => setState(() {
+        _searching = false;
+        _query = '';
+        _searchController.clear();
+      });
+
   Future<void> _onAdd() async {
-    if (_segment == InventorySegment.food) {
-      await context.push('/pantry/add');
-      await refreshPantryList(ref);
-      ref.invalidate(lowStockItemsProvider);
-    } else {
+    if (_segment == InventorySegment.assets) {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(builder: (_) => const AssetFormScreen()),
       );
       ref.invalidate(homeAssetsProvider);
       ref.invalidate(warrantyExpiringAssetsProvider);
+    } else {
+      await context.push('/pantry/add');
+      await refreshPantryList(ref);
+      ref.invalidate(lowStockItemsProvider);
+    }
+  }
+
+  Future<void> _deleteSelected(String key) async {
+    final ids = ref.read(multiSelectProvider(key)).ids.toList();
+    if (ids.isEmpty) return;
+    final confirmed = await confirmBulkDelete(context, ids.length);
+    if (!confirmed) return;
+
+    if (key == MultiSelectKeys.pantry) {
+      final repo = ref.read(pantryRepositoryProvider);
+      for (final id in ids) {
+        await repo.deleteItem(id);
+      }
+      ref.read(multiSelectProvider(key).notifier).clear();
+      await refreshPantryList(ref);
+      ref.invalidate(lowStockItemsProvider);
+    } else {
+      final repo = ref.read(assetRepositoryProvider);
+      for (final id in ids) {
+        await repo.deleteAsset(id);
+      }
+      ref.read(multiSelectProvider(key).notifier).clear();
+      ref.invalidate(homeAssetsProvider);
+      ref.invalidate(warrantyExpiringAssetsProvider);
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.itemsDeleted(ids.length))),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isFood = _segment == InventorySegment.food;
+    final isAssets = _segment == InventorySegment.assets;
+    final isAll = _segment == InventorySegment.all;
+
+    final activeKey = isFood
+        ? MultiSelectKeys.pantry
+        : isAssets
+            ? MultiSelectKeys.assets
+            : null;
+    final selection =
+        activeKey != null ? ref.watch(multiSelectProvider(activeKey)) : null;
+
+    List<String> visibleIds = const [];
+    if (isFood) {
+      visibleIds = filterPantryItems(
+        ref.watch(pantryItemsListProvider).items,
+        query: _query,
+        category: _pantryCategory,
+      ).map((e) => e.id).toList();
+    } else if (isAssets) {
+      visibleIds = filterAssets(
+        ref.watch(homeAssetsProvider).valueOrNull ?? const [],
+        query: _query,
+        category: _pantryCategory,
+      ).map((e) => e.id).toList();
+    }
 
     return Scaffold(
-      appBar: FeatureScreenAppBar.forShellRoute(
-        context,
-        title: AppStrings.inventoryTitle,
-        subtitle: AppStrings.inventorySubtitle,
-        actions: [
-          FilterMenuButton<InventorySegment>(
-            value: _segment,
-            onSelected: (value) => setState(() => _segment = value),
-            options: const [
-              FilterMenuOption(
-                value: InventorySegment.food,
-                label: AppStrings.segmentFood,
-                icon: Icons.kitchen_outlined,
-              ),
-              FilterMenuOption(
-                value: InventorySegment.assets,
-                label: AppStrings.segmentAssets,
-                icon: Icons.inventory_2_outlined,
-              ),
-            ],
-          ),
-        ],
-      ),
+      appBar: (selection?.active ?? false)
+          ? SelectionAppBar(
+              selectedCount: selection!.count,
+              totalCount: visibleIds.length,
+              onClose: () =>
+                  ref.read(multiSelectProvider(activeKey!).notifier).clear(),
+              onSelectAll: () {
+                final notifier =
+                    ref.read(multiSelectProvider(activeKey!).notifier);
+                if (selection.count >= visibleIds.length) {
+                  notifier.selectAll(const []);
+                } else {
+                  notifier.selectAll(visibleIds);
+                }
+              },
+              onDelete: () => _deleteSelected(activeKey!),
+            )
+          : _searching
+          ? _buildSearchAppBar(context)
+          : FeatureScreenAppBar.forShellRoute(
+              context,
+              title: AppStrings.inventoryTitle,
+              subtitle: AppStrings.inventorySubtitle,
+              actions: [
+                IconButton(
+                  tooltip: AppStrings.search,
+                  icon: const Icon(Icons.search),
+                  onPressed: _openSearch,
+                ),
+                FilterMenuButton<InventorySegment>(
+                  value: _segment,
+                  onSelected: (value) => setState(() {
+                    _segment = value;
+                    _pantryCategory = null;
+                  }),
+                  options: const [
+                    FilterMenuOption(
+                      value: InventorySegment.all,
+                      label: AppStrings.segmentAll,
+                      icon: Icons.apps_outlined,
+                    ),
+                    FilterMenuOption(
+                      value: InventorySegment.food,
+                      label: AppStrings.segmentFood,
+                      icon: Icons.kitchen_outlined,
+                    ),
+                    FilterMenuOption(
+                      value: InventorySegment.assets,
+                      label: AppStrings.segmentAssets,
+                      icon: Icons.inventory_2_outlined,
+                    ),
+                  ],
+                ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _onAdd,
         icon: const Icon(Icons.add),
-        label: Text(isFood ? AppStrings.addItem : AppStrings.addAsset),
+        label: Text(isAssets ? AppStrings.addAsset : AppStrings.addItem),
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: SearchBar(
-              hintText: AppStrings.search,
-              leading: const Icon(Icons.search),
-              elevation: const WidgetStatePropertyAll(0),
-              backgroundColor: WidgetStatePropertyAll(
-                Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest
-                    .withOpacity(0.5),
-              ),
-              onChanged: (value) =>
-                  setState(() => _query = value.toLowerCase()),
+          const SizedBox(height: 4),
+          if (!isAll)
+            _CategoryChipsBar(
+              options: _categoryOptions(isFood),
+              selected: _pantryCategory,
+              onSelected: (value) =>
+                  setState(() => _pantryCategory = value),
             ),
-          ),
-          _SummaryLine(isFood: isFood),
+          if (!isAll) _SummaryLine(isFood: isFood),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                if (isFood) {
-                  await refreshPantryList(ref);
-                } else {
-                  ref.invalidate(homeAssetsProvider);
-                  await ref.read(homeAssetsProvider.future);
-                }
+                await refreshPantryList(ref);
+                ref.invalidate(homeAssetsProvider);
+                await ref.read(homeAssetsProvider.future);
               },
-              child: isFood
-                  ? PantryListTab(query: _query)
-                  : AssetsListTab(query: _query),
+              child: isAll
+                  ? InventoryAllTab(query: _query)
+                  : isFood
+                      ? PantryListTab(
+                          query: _query, category: _pantryCategory)
+                      : AssetsListTab(
+                          query: _query, category: _pantryCategory),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildSearchAppBar(BuildContext context) {
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        tooltip: AppStrings.close,
+        onPressed: _closeSearch,
+      ),
+      title: TextField(
+        controller: _searchController,
+        autofocus: true,
+        textInputAction: TextInputAction.search,
+        decoration: const InputDecoration(
+          hintText: AppStrings.search,
+          border: InputBorder.none,
+        ),
+        onChanged: (value) => setState(() => _query = value.toLowerCase()),
+      ),
+      actions: [
+        if (_query.isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.clear),
+            onPressed: () => setState(() {
+              _query = '';
+              _searchController.clear();
+            }),
+          ),
+      ],
+    );
+  }
+
+  List<({String? value, String label})> _categoryOptions(bool isFood) {
+    return [
+      const (value: null, label: AppStrings.allCategories),
+      if (isFood)
+        for (final c in PantryCategories.values) (value: c, label: c)
+      else
+        for (final c in AssetCategories.all) (value: c.value, label: c.label),
+    ];
+  }
+}
+
+/// Horizontally scrollable category chips shown below the search bar.
+class _CategoryChipsBar extends StatelessWidget {
+  const _CategoryChipsBar({
+    required this.options,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<({String? value, String label})> options;
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: options.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final option = options[index];
+          final isSelected = option.value == selected;
+          return ChoiceChip(
+            label: Text(option.label),
+            selected: isSelected,
+            onSelected: (_) => onSelected(option.value),
+          );
+        },
       ),
     );
   }

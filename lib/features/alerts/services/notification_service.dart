@@ -5,7 +5,8 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../core/logging/app_logger.dart';
-import '../../../shared/constants/reminder_repeat.dart';
+import '../../../shared/models/reminder_repeat_spec.dart';
+import '../../../shared/utils/reminder_recurrence.dart';
 import '../data/notification_alert_type.dart';
 import '../data/notification_sound_settings.dart';
 
@@ -306,71 +307,64 @@ class NotificationService {
     }
   }
 
+  /// A reminder can fan out into several notifications (one per selected
+  /// weekday, or a batch of pre-computed one-shots for non-native patterns).
+  /// This caps how many slots we schedule and later cancel per reminder.
+  static const _maxStandaloneSlots = ReminderRecurrence.preScheduleCount;
+
   Future<void> scheduleStandaloneReminder({
     required String reminderId,
     required String title,
     required String body,
     required DateTime reminderAt,
-    String repeat = ReminderRepeat.none,
+    ReminderRepeatSpec spec = ReminderRepeatSpec.none,
   }) async {
-    final recurring = ReminderRepeat.isRecurring(repeat);
     final now = tz.TZDateTime.now(tz.local);
-    var scheduled = tz.TZDateTime.from(reminderAt.toLocal(), tz.local);
-    if (scheduled.isBefore(now)) {
-      // One-time reminders in the past are dropped; recurring ones roll forward
-      // to their next occurrence so the OS has a valid future anchor.
-      if (!recurring) return;
-      scheduled = _advanceToFuture(scheduled, now, repeat);
-    }
-
-    await _zonedSchedule(
-      id: _notificationId('rem_$reminderId'),
-      title: 'Reminder',
-      body: title,
-      scheduled: scheduled,
-      details: await _detailsFor(
-        NotificationAlertType.standaloneReminders,
-        importance: Importance.high,
-        priority: Priority.high,
-        iosSubtitle: body,
-      ),
-      matchDateTimeComponents: _repeatComponents(repeat),
+    final entries = ReminderRecurrence.scheduleEntries(
+      spec,
+      reminderAt.toLocal(),
+      DateTime.now(),
     );
-  }
+    if (entries.isEmpty) return;
 
-  DateTimeComponents? _repeatComponents(String repeat) => switch (repeat) {
-        ReminderRepeat.daily => DateTimeComponents.time,
-        ReminderRepeat.weekly => DateTimeComponents.dayOfWeekAndTime,
-        ReminderRepeat.monthly => DateTimeComponents.dayOfMonthAndTime,
-        ReminderRepeat.yearly => DateTimeComponents.dateAndTime,
-        _ => null,
-      };
+    final details = await _detailsFor(
+      NotificationAlertType.standaloneReminders,
+      importance: Importance.high,
+      priority: Priority.high,
+      iosSubtitle: body,
+    );
 
-  tz.TZDateTime _advanceToFuture(
-    tz.TZDateTime start,
-    tz.TZDateTime now,
-    String repeat,
-  ) {
-    var next = start;
-    var guard = 0;
-    while (!next.isAfter(now) && guard < 1000) {
-      next = switch (repeat) {
-        ReminderRepeat.daily => next.add(const Duration(days: 1)),
-        ReminderRepeat.weekly => next.add(const Duration(days: 7)),
-        ReminderRepeat.monthly => tz.TZDateTime(
-            tz.local, next.year, next.month + 1, next.day, next.hour,
-            next.minute),
-        ReminderRepeat.yearly => tz.TZDateTime(
-            tz.local, next.year + 1, next.month, next.day, next.hour,
-            next.minute),
-        _ => next.add(const Duration(days: 1)),
-      };
-      guard++;
+    for (var i = 0; i < entries.length && i < _maxStandaloneSlots; i++) {
+      final entry = entries[i];
+      final scheduled = tz.TZDateTime.from(entry.when, tz.local);
+      if (scheduled.isBefore(now)) continue;
+      await _zonedSchedule(
+        id: _notificationId('rem_${reminderId}_$i'),
+        title: 'Reminder',
+        body: title,
+        scheduled: scheduled,
+        details: details,
+        matchDateTimeComponents: _componentFor(entry.component),
+      );
     }
-    return next;
   }
+
+  DateTimeComponents? _componentFor(ReminderRepeatComponent? component) =>
+      switch (component) {
+        ReminderRepeatComponent.time => DateTimeComponents.time,
+        ReminderRepeatComponent.dayOfWeekAndTime =>
+          DateTimeComponents.dayOfWeekAndTime,
+        ReminderRepeatComponent.dayOfMonthAndTime =>
+          DateTimeComponents.dayOfMonthAndTime,
+        ReminderRepeatComponent.dateAndTime => DateTimeComponents.dateAndTime,
+        null => null,
+      };
 
   Future<void> cancelStandaloneReminder(String reminderId) async {
+    for (var i = 0; i < _maxStandaloneSlots; i++) {
+      await _plugin.cancel(_notificationId('rem_${reminderId}_$i'));
+    }
+    // Also clear the legacy single-slot id used before multi-slot scheduling.
     await _plugin.cancel(_notificationId('rem_$reminderId'));
   }
 

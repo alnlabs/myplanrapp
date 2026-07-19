@@ -8,12 +8,16 @@ class CompactGridCard extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.onTap,
+    this.onLongPress,
+    this.selected = false,
   });
 
   final Widget leading;
   final String title;
   final String? subtitle;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +26,10 @@ class CompactGridCard extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
+      color: selected ? theme.colorScheme.primaryContainer : null,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
           child: Column(

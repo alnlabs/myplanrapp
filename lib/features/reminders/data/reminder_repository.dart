@@ -4,13 +4,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/providers/supabase_providers.dart';
 import '../../../shared/constants/list_pagination.dart';
 import '../../../shared/constants/plan_constants.dart';
-import '../../../shared/constants/reminder_repeat.dart';
 import '../../../shared/models/app_reminder_item.dart';
 import '../../../shared/models/medicine_schedule.dart';
 import '../../../shared/models/plan.dart';
+import '../../../shared/models/reminder_repeat_spec.dart';
 import '../../../shared/models/standalone_reminder.dart';
 import '../../../shared/models/subscription.dart';
 import '../../../shared/utils/formatters.dart';
+import '../../../shared/utils/reminder_recurrence.dart';
 import '../../../shared/utils/schedule_time_parser.dart';
 import '../../alerts/services/notification_service.dart';
 import '../../auth/data/auth_repository.dart';
@@ -69,7 +70,7 @@ class ReminderRepository {
     required String title,
     String? notes,
     required DateTime reminderAt,
-    String repeat = ReminderRepeat.none,
+    ReminderRepeatSpec repeatSpec = ReminderRepeatSpec.none,
   }) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Not signed in');
@@ -82,7 +83,7 @@ class ReminderRepository {
       notes: notes?.trim().isEmpty ?? true ? null : notes!.trim(),
       reminderAt: reminderAt,
       isActive: true,
-      repeat: ReminderRepeat.normalize(repeat),
+      repeatSpec: repeatSpec,
     );
 
     final data = await _client
@@ -256,7 +257,7 @@ class ReminderRepository {
       title: reminder.title,
       body: reminder.notes ?? reminder.title,
       reminderAt: reminder.reminderAt,
-      repeat: reminder.repeat,
+      spec: reminder.repeatSpec,
     );
   }
 
@@ -277,7 +278,7 @@ class ReminderRepository {
             reminderAt: r.reminderAt,
             isRepeating: r.isRecurring,
             timeLabel: r.isRecurring
-                ? '${ReminderRepeat.repeatsLabel(r.repeat)} · '
+                ? '${ReminderRecurrence.describe(r.repeatSpec, r.reminderAt.toLocal())} · '
                     '${Formatters.time(r.reminderAt.toLocal())}'
                 : null,
           ),
