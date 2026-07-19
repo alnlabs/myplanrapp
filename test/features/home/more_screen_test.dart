@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:myplanr/core/providers/supabase_providers.dart';
 import 'package:myplanr/core/strings/app_strings.dart';
 import 'package:myplanr/features/home/presentation/more_screen.dart';
 import 'package:myplanr/features/household/data/household_settings_repository.dart';
@@ -17,6 +18,9 @@ void main() {
           enabledModulesProvider.overrideWithValue(
             HouseholdModules.sanitizeEnabled(HouseholdModules.defaultEnabled),
           ),
+          // Owner-only tile reads this synchronously; stub it so the test
+          // doesn't touch an uninitialized Supabase client.
+          currentUserIdProvider.overrideWithValue(null),
         ],
         child: const MoreScreen(),
       );

@@ -10,6 +10,7 @@ import '../../../shared/providers/multi_select_provider.dart';
 import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../../../shared/widgets/filter_menu_button.dart';
 import '../../../shared/widgets/list_display_mode_toggle.dart';
+import '../../../shared/widgets/blocking_progress.dart';
 import '../../../shared/widgets/selection_app_bar.dart';
 import '../../assets/data/asset_repository.dart';
 import '../../assets/presentation/asset_form_screen.dart';
@@ -78,30 +79,33 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final ids = ref.read(multiSelectProvider(key)).ids.toList();
     if (ids.isEmpty) return;
     final confirmed = await confirmBulkDelete(context, ids.length);
-    if (!confirmed) return;
+    if (!confirmed || !mounted) return;
 
-    if (key == MultiSelectKeys.pantry) {
-      final repo = ref.read(pantryRepositoryProvider);
-      for (final id in ids) {
-        await repo.deleteItem(id);
+    try {
+      if (key == MultiSelectKeys.pantry) {
+        final repo = ref.read(pantryRepositoryProvider);
+        await runWithBlockingProgress(context, () => repo.deleteItems(ids));
+        ref.read(multiSelectProvider(key).notifier).clear();
+        await refreshPantryList(ref);
+        ref.invalidate(lowStockItemsProvider);
+      } else {
+        final repo = ref.read(assetRepositoryProvider);
+        await runWithBlockingProgress(context, () => repo.deleteAssets(ids));
+        ref.read(multiSelectProvider(key).notifier).clear();
+        ref.invalidate(homeAssetsProvider);
+        ref.invalidate(warrantyExpiringAssetsProvider);
       }
-      ref.read(multiSelectProvider(key).notifier).clear();
-      await refreshPantryList(ref);
-      ref.invalidate(lowStockItemsProvider);
-    } else {
-      final repo = ref.read(assetRepositoryProvider);
-      for (final id in ids) {
-        await repo.deleteAsset(id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.itemsDeleted(ids.length))),
+        );
       }
-      ref.read(multiSelectProvider(key).notifier).clear();
-      ref.invalidate(homeAssetsProvider);
-      ref.invalidate(warrantyExpiringAssetsProvider);
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.itemsDeleted(ids.length))),
-      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.errorGeneric)),
+        );
+      }
     }
   }
 

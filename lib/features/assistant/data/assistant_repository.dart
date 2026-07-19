@@ -10,6 +10,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/providers/supabase_providers.dart';
 import '../../../shared/constants/list_pagination.dart';
 import '../../../shared/constants/storage_constants.dart';
+import '../../../shared/utils/batch_delete.dart';
 import '../../auth/data/auth_repository.dart';
 import 'models/receipt_analysis.dart';
 import 'models/saved_receipt.dart';
@@ -310,6 +311,10 @@ class AssistantRepository {
   /// Deletes a receipt and its line items (cascade handles the children).
   Future<void> deleteReceipt(String receiptId) async {
     await _client.from('receipts').delete().eq('id', receiptId);
+  }
+
+  Future<void> deleteReceipts(List<String> ids) async {
+    await deleteByIds(_client, 'receipts', ids);
   }
 
   /// Line items for one receipt, ordered as printed.

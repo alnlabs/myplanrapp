@@ -5,6 +5,7 @@ import '../../../core/providers/supabase_providers.dart';
 import '../../../shared/constants/list_pagination.dart';
 import '../../../shared/constants/pantry_availability.dart';
 import '../../../shared/models/shopping_list_item.dart';
+import '../../../shared/utils/batch_delete.dart';
 
 class ShoppingRepository {
   ShoppingRepository(this._client);
@@ -55,6 +56,10 @@ class ShoppingRepository {
 
   Future<void> deleteItem(String id) async {
     await _client.from('shopping_list_items').delete().eq('id', id);
+  }
+
+  Future<void> deleteItems(List<String> ids) async {
+    await deleteByIds(_client, 'shopping_list_items', ids);
   }
 
   Future<void> clearChecked(String householdId) async {

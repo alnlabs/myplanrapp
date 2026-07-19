@@ -368,6 +368,11 @@ class NotificationService {
     await _plugin.cancel(_notificationId('rem_$reminderId'));
   }
 
+  /// Cancels every scheduled/pending notification. Used when clearing data.
+  Future<void> cancelAll() async {
+    await _plugin.cancelAll();
+  }
+
   /// Plays a one-shot preview using the saved sound for [alertType].
   Future<bool> previewAlertSound(NotificationAlertType alertType) async {
     if (!await _notificationsAllowed()) return false;

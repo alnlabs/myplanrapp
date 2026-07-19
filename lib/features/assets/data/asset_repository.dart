@@ -5,6 +5,7 @@ import '../../../core/providers/supabase_providers.dart';
 import '../../../shared/constants/asset_constants.dart';
 import '../../../shared/constants/list_pagination.dart';
 import '../../../shared/models/home_asset.dart';
+import '../../../shared/utils/batch_delete.dart';
 import '../../auth/data/auth_repository.dart';
 
 class AssetRepository {
@@ -66,6 +67,10 @@ class AssetRepository {
 
   Future<void> deleteAsset(String id) async {
     await _client.from('home_assets').delete().eq('id', id);
+  }
+
+  Future<void> deleteAssets(List<String> ids) async {
+    await deleteByIds(_client, 'home_assets', ids);
   }
 
   Future<List<AssetServiceRecord>> fetchServiceRecords(String assetId) async {

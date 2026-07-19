@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/providers/multi_select_provider.dart';
 import '../../../shared/utils/formatters.dart';
+import '../../../shared/widgets/blocking_progress.dart';
 import '../../../shared/widgets/selection_app_bar.dart';
 import '../data/assistant_repository.dart';
 import '../data/models/saved_receipt.dart';
@@ -66,17 +67,23 @@ class ReceiptsListScreen extends ConsumerWidget {
         ref.read(multiSelectProvider(MultiSelectKeys.receipts)).ids.toList();
     if (ids.isEmpty) return;
     final confirmed = await confirmBulkDelete(context, ids.length);
-    if (!confirmed) return;
+    if (!confirmed || !context.mounted) return;
     final repo = ref.read(assistantRepositoryProvider);
-    for (final id in ids) {
-      await repo.deleteReceipt(id);
-    }
-    notifier.clear();
-    ref.invalidate(savedReceiptsProvider);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.itemsDeleted(ids.length))),
-      );
+    try {
+      await runWithBlockingProgress(context, () => repo.deleteReceipts(ids));
+      notifier.clear();
+      ref.invalidate(savedReceiptsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.itemsDeleted(ids.length))),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.errorGeneric)),
+        );
+      }
     }
   }
 }

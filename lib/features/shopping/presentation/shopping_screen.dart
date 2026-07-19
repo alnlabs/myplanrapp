@@ -11,6 +11,7 @@ import '../../../shared/utils/list_sharing.dart';
 import '../../../shared/widgets/feature_screen_app_bar.dart';
 import '../../../shared/widgets/async_screen_body.dart';
 import '../../../shared/widgets/restock_amount_sheet.dart';
+import '../../../shared/widgets/blocking_progress.dart';
 import '../../../shared/widgets/selection_app_bar.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../pantry/data/pantry_items_list_provider.dart';
@@ -96,17 +97,23 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
         ref.read(multiSelectProvider(MultiSelectKeys.shopping)).ids.toList();
     if (ids.isEmpty) return;
     final confirmed = await confirmBulkDelete(context, ids.length);
-    if (!confirmed) return;
+    if (!confirmed || !mounted) return;
     final repo = ref.read(shoppingRepositoryProvider);
-    for (final id in ids) {
-      await repo.deleteItem(id);
-    }
-    notifier.clear();
-    ref.invalidate(shoppingListProvider);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.itemsDeleted(ids.length))),
-      );
+    try {
+      await runWithBlockingProgress(context, () => repo.deleteItems(ids));
+      notifier.clear();
+      ref.invalidate(shoppingListProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.itemsDeleted(ids.length))),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.errorGeneric)),
+        );
+      }
     }
   }
 

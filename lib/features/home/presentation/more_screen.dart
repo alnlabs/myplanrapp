@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/strings/app_strings.dart';
 import '../../../shared/constants/nav_features.dart';
+import '../../../shared/providers/record_permissions.dart';
 import '../../../shared/utils/shell_navigation.dart';
 import '../../../shared/widgets/secret_tap.dart';
 import '../../auth/data/auth_repository.dart';
@@ -45,6 +46,19 @@ class MoreScreen extends ConsumerWidget {
         ),
       ),
     ];
+
+    final isOwner = ref.watch(isHouseholdOwnerProvider);
+    if (isOwner) {
+      householdItems.add(
+        _MoreTile(
+          icon: Icons.restart_alt_outlined,
+          color: theme.colorScheme.error,
+          title: AppStrings.resetDataTitle,
+          subtitle: AppStrings.moreResetHint,
+          onTap: () => context.push('/reset-data'),
+        ),
+      );
+    }
 
     final appItems = <_MoreTile>[
       _MoreTile(

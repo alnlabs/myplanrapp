@@ -734,6 +734,31 @@ abstract final class AppStrings {
   static const adminDeleted = 'Deleted';
   static const adminDeleteFailed = 'Could not delete. Please try again.';
 
+  // Reset data (owner-only)
+  static const resetDataTitle = 'Reset data';
+  static const moreResetHint = 'Clear app data without deleting anyone';
+  static const resetDataSubtitle =
+      'Permanently clear data for your family. Accounts, members, and settings '
+      'are kept.';
+  static const resetSelectAll = 'Reset everything';
+  static const resetOwnerOnly = 'Only the family owner can reset data.';
+  static const resetButton = 'Reset selected';
+  static const resetNothingSelected = 'Select at least one thing to reset.';
+  static const resetConfirmTitle = 'Reset data?';
+  static String resetConfirmBody(int n) =>
+      'This permanently deletes the selected data '
+      '(${n == 1 ? '1 category' : '$n categories'}) for everyone in your '
+      'family and cannot be undone.';
+  static const resetConfirmPrompt = 'Type RESET to confirm';
+  static const resetConfirmWord = 'RESET';
+  static const resetConfirmAction = 'Reset now';
+  static const resetInProgress = 'Resetting…';
+  static String resetDone(int n) =>
+      n == 1 ? '1 item deleted' : '$n items deleted';
+  static const resetFailed = 'Could not reset data. Please try again.';
+  static const resetTooLarge =
+      'Too much data to clear at once. Try selecting fewer categories.';
+
   // Common
   static const save = 'Save';
   static const cancel = 'Cancel';

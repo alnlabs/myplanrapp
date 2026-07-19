@@ -10,6 +10,7 @@ import '../../features/auth/presentation/register_screen.dart';
 import '../../features/admin/data/admin_gate_provider.dart';
 import '../../features/admin/presentation/admin_dashboard_screen.dart';
 import '../../features/admin/presentation/admin_otp_screen.dart';
+import '../../features/settings/presentation/reset_data_screen.dart';
 import '../../features/expenses/presentation/add_recurring_expense_screen.dart';
 import '../../features/expenses/presentation/expense_group_detail_screen.dart';
 import '../../features/expenses/presentation/expense_group_form_screen.dart';
@@ -154,6 +155,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin',
         builder: (_, __) => const AdminOtpScreen(),
+      ),
+      GoRoute(
+        path: '/reset-data',
+        builder: (_, __) => const ResetDataScreen(),
       ),
       GoRoute(
         path: '/admin/home',

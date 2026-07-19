@@ -6,6 +6,7 @@ import '../../../shared/constants/list_pagination.dart';
 import '../../../shared/models/paginated_result.dart';
 import '../../../shared/utils/paginated_page_parser.dart';
 import '../../../shared/models/pantry_item.dart';
+import '../../../shared/utils/batch_delete.dart';
 import '../../auth/data/auth_repository.dart';
 
 class PantryRepository {
@@ -71,6 +72,10 @@ class PantryRepository {
 
   Future<void> deleteItem(String id) async {
     await _client.from('pantry_items').delete().eq('id', id);
+  }
+
+  Future<void> deleteItems(List<String> ids) async {
+    await deleteByIds(_client, 'pantry_items', ids);
   }
 
   Future<StockEvent> applyStockEvent({
