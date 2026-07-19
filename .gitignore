@@ -51,6 +51,7 @@ app.*.map.json
 .env
 .env.*
 !.env.example
+!.env.server.example
 
 # Node/npm (not used — Supabase CLI binary)
 node_modules/

@@ -3,7 +3,7 @@
 # Uses direct DB URL (no `supabase login` required).
 #
 # Requires: Supabase CLI in ~/.local/share/supabase (see README)
-#           .env with SUPABASE_URL and SUPABASE_DB_PASSWORD
+#           .env with SUPABASE_URL and .env.server with SUPABASE_DB_PASSWORD
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -16,12 +16,17 @@ if ! command -v supabase >/dev/null 2>&1; then
   exit 1
 fi
 
+set -a
 if [[ -f .env ]]; then
-  set -a
   # shellcheck disable=SC1091
   source .env
-  set +a
 fi
+# Server-only secrets (DB password, SMTP) live here and are never bundled.
+if [[ -f .env.server ]]; then
+  # shellcheck disable=SC1091
+  source .env.server
+fi
+set +a
 
 if [[ -z "${SUPABASE_URL:-}" || -z "${SUPABASE_DB_PASSWORD:-}" ]]; then
   echo "Set SUPABASE_URL and SUPABASE_DB_PASSWORD in .env"

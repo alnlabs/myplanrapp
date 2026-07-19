@@ -57,7 +57,9 @@ android {
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         // flutter_secure_storage requires Android 6.0 (API 23) or higher.
         minSdk = 23
-        targetSdk = flutter.targetSdkVersion
+        // Pinned to 35 (Android 15) — required by Google Play in 2026.
+        // (Flutter 3.22's flutter.targetSdkVersion is 34, which Play rejects.)
+        targetSdk = 35
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
     }
